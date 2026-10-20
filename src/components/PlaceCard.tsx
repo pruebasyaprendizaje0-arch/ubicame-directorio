@@ -3,7 +3,20 @@
 import React from 'react';
 import { Lugar } from '@/types/lugar';
 import { formatDistance } from '@/lib/geo';
-import { MapPin, MessageCircle, ExternalLink, Navigation, Sparkles, ShieldCheck } from 'lucide-react';
+import { getPlaceActionConfig } from '@/lib/placeActions';
+import {
+  MapPin,
+  MessageCircle,
+  ExternalLink,
+  Navigation,
+  Sparkles,
+  ShieldCheck,
+  UtensilsCrossed,
+  ShoppingBag,
+  Wrench,
+  Calendar,
+  BedDouble,
+} from 'lucide-react';
 
 interface PlaceCardProps {
   place: Lugar;
@@ -21,6 +34,24 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitud},${place.longitud}`;
   const whatsappUrl = place.whatsapp ? `https://wa.me/${place.whatsapp.replace(/\+/g, '')}` : undefined;
+
+  const actionConfig = getPlaceActionConfig(place);
+
+  const renderActionIcon = () => {
+    switch (actionConfig.actionType) {
+      case 'booking':
+        return <BedDouble size={13} className="shrink-0" />;
+      case 'appointments':
+        return <Calendar size={13} className="shrink-0" />;
+      case 'service':
+        return <Wrench size={13} className="shrink-0" />;
+      case 'catalog':
+        return <ShoppingBag size={13} className="shrink-0" />;
+      case 'menu':
+      default:
+        return <UtensilsCrossed size={13} className="shrink-0" />;
+    }
+  };
 
   return (
     <article
@@ -104,7 +135,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
 
       {/* Action Buttons Row: 2x2 grid on small screens, horizontal flex on tablets/PC */}
       <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 pt-2.5 border-t border-slate-800/80">
-        {/* Enlace directo al Menú en ubicame.cc */}
+        {/* Enlace directo a la acción específica de ubicame.cc (Menú, Catálogo, Cotizar, Citas o Reservas) */}
         {place.url_perfil && (
           <a
             href={place.url_perfil}
@@ -112,8 +143,9 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
             rel="noopener noreferrer"
             className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 sm:py-1.5 px-2.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 active:scale-95 transition-all shadow-sm"
           >
-            <span>Ver Menú</span>
-            <ExternalLink size={12} />
+            {renderActionIcon()}
+            <span>{actionConfig.label}</span>
+            <ExternalLink size={11} className="opacity-75" />
           </a>
         )}
 

@@ -14,9 +14,14 @@ import {
   Landmark,
   Wrench,
   Building,
+  UtensilsCrossed,
+  ShoppingBag,
+  Calendar,
+  BedDouble,
 } from 'lucide-react';
 import { Lugar } from '@/types/lugar';
 import { formatDistance } from '@/lib/geo';
+import { getPlaceActionConfig } from '@/lib/placeActions';
 
 interface PlaceDetailModalProps {
   place: Lugar | null;
@@ -39,6 +44,24 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   const whatsappUrl = place.whatsapp
     ? `https://wa.me/${place.whatsapp.replace(/\+/g, '')}`
     : undefined;
+
+  const actionConfig = getPlaceActionConfig(place);
+
+  const renderActionIcon = () => {
+    switch (actionConfig.actionType) {
+      case 'booking':
+        return <BedDouble size={15} className="shrink-0" />;
+      case 'appointments':
+        return <Calendar size={15} className="shrink-0" />;
+      case 'service':
+        return <Wrench size={15} className="shrink-0" />;
+      case 'catalog':
+        return <ShoppingBag size={15} className="shrink-0" />;
+      case 'menu':
+      default:
+        return <UtensilsCrossed size={15} className="shrink-0" />;
+    }
+  };
 
   const iconSrc =
     place.icono.startsWith('/') || place.icono.startsWith('http')
@@ -180,8 +203,9 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
               rel="noopener noreferrer"
               className="col-span-2 sm:flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 active:scale-95 transition-all shadow-md"
             >
-              <span>Ver Menú Digital</span>
-              <ExternalLink size={13} />
+              {renderActionIcon()}
+              <span>{actionConfig.detailLabel}</span>
+              <ExternalLink size={13} className="opacity-75" />
             </a>
           )}
 

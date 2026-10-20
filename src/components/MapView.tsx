@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Lugar } from '@/types/lugar';
 import { formatDistance } from '@/lib/geo';
+import { getPlaceActionConfig } from '@/lib/placeActions';
 
 interface MapViewProps {
   lugares: Lugar[];
@@ -234,7 +235,7 @@ export const MapView: React.FC<MapViewProps> = ({
                         rel="noopener noreferrer"
                         className="flex-1 py-1 px-2 rounded text-[10.5px] font-bold bg-amber-500 text-slate-950 text-center hover:bg-amber-400 transition-colors"
                       >
-                        Ver Menú
+                        {getPlaceActionConfig(place).label}
                       </a>
                     )}
                     {place.whatsapp && (

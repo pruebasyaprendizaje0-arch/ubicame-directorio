@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Lugar } from '@/types/lugar';
+import { getPlaceActionConfig } from '@/lib/placeActions';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { PlaceEditModal } from '@/components/admin/PlaceEditModal';
 import {
@@ -448,7 +449,7 @@ export default function AdminPlacesPage() {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-amber-400 hover:underline"
                           >
-                            <span>Ver Menú</span>
+                            <span>{getPlaceActionConfig(place).label}</span>
                             <ExternalLink size={11} />
                           </a>
                         ) : (
