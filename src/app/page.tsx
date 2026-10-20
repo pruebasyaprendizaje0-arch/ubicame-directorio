@@ -1,9 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Lugar, PlaceFilters } from '@/types/lugar';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Lugar } from '@/types/lugar';
 import { ZoneList } from '@/components/ZoneList';
 import { DynamicMap } from '@/components/DynamicMap';
+import {
+  PROVINCIAS_ECUADOR,
+  getCantonesPorProvincia,
+  getParroquiasPorCanton,
+  getComunasPorFiltros,
+} from '@/lib/geo';
 import {
   MapPin,
   Search,
@@ -12,49 +18,135 @@ import {
   List as ListIcon,
   Sparkles,
   ExternalLink,
-  ChevronRight,
+  Navigation,
+  Compass,
+  SlidersHorizontal,
+  ChevronDown,
+  Loader2,
+  Check,
+  Building,
+  Landmark,
+  Home,
+  Map,
 } from 'lucide-react';
 
 export default function DirectoryPage() {
   const [places, setPlaces] = useState<Lugar[]>([]);
-  const [zonas, setZonas] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // View mode: 'list' or 'map'
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [selectedPlace, setSelectedPlace] = useState<Lugar | null>(null);
 
-  // Filters
+  // Search & 4-Level Territorial Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedZona, setSelectedZona] = useState<string | undefined>(undefined);
+  const [selectedProvincia, setSelectedProvincia] = useState<string>('Santa Elena');
+  const [selectedCanton, setSelectedCanton] = useState<string>('');
+  const [selectedParroquia, setSelectedParroquia] = useState<string>('');
+  const [selectedComuna, setSelectedComuna] = useState<string>('');
   const [onlyUbicameCc, setOnlyUbicameCc] = useState(false);
+  const [showGeoFilterBar, setShowGeoFilterBar] = useState(true);
+
+  // "Cerca de mí" Geolocation State
+  const [cercaDeMi, setCercaDeMi] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
+
+  // Cascading options
+  const availableCantones = useMemo(() => {
+    return getCantonesPorProvincia(selectedProvincia || undefined);
+  }, [selectedProvincia]);
+
+  const availableParroquias = useMemo(() => {
+    return getParroquiasPorCanton(selectedProvincia || undefined, selectedCanton || undefined);
+  }, [selectedProvincia, selectedCanton]);
+
+  const availableComunas = useMemo(() => {
+    return getComunasPorFiltros(
+      selectedProvincia || undefined,
+      selectedCanton || undefined,
+      selectedParroquia || undefined
+    );
+  }, [selectedProvincia, selectedCanton, selectedParroquia]);
 
   // Fetch data
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (searchQuery) params.set('q', searchQuery);
-        if (selectedZona) params.set('zona', selectedZona);
-        if (onlyUbicameCc) params.set('solo_ubicame_cc', 'true');
+  const loadPlaces = useCallback(async () => {
+    setLoading(true);
+    setGeoError(null);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('q', searchQuery);
+      if (selectedProvincia) params.set('provincia', selectedProvincia);
+      if (selectedCanton) params.set('canton', selectedCanton);
+      if (selectedParroquia) params.set('parroquia', selectedParroquia);
+      if (selectedComuna) params.set('zona', selectedComuna);
+      if (onlyUbicameCc) params.set('solo_ubicame_cc', 'true');
 
-        const res = await fetch(`/api/places?${params.toString()}`);
-        const json = await res.json();
-        if (json.success) {
-          setPlaces(json.data);
-          if (json.zonas) {
-            setZonas(json.zonas);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching places:', err);
-      } finally {
-        setLoading(false);
+      if (cercaDeMi && userLocation) {
+        params.set('cerca_de_mi', 'true');
+        params.set('user_lat', userLocation.lat.toString());
+        params.set('user_lng', userLocation.lng.toString());
       }
+
+      const res = await fetch(`/api/places?${params.toString()}`);
+      const json = await res.json();
+      if (json.success) {
+        setPlaces(json.data);
+      }
+    } catch (err) {
+      console.error('Error fetching places:', err);
+    } finally {
+      setLoading(false);
     }
-    loadData();
-  }, [searchQuery, selectedZona, onlyUbicameCc]);
+  }, [searchQuery, selectedProvincia, selectedCanton, selectedParroquia, selectedComuna, onlyUbicameCc, cercaDeMi, userLocation]);
+
+  useEffect(() => {
+    loadPlaces();
+  }, [loadPlaces]);
+
+  // Toggle "Cerca de mí" GPS tracking
+  const handleToggleCercaDeMi = () => {
+    if (cercaDeMi) {
+      setCercaDeMi(false);
+      setUserLocation(null);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setGeoError('Tu dispositivo no soporta geolocalización GPS.');
+      return;
+    }
+
+    setIsLocating(true);
+    setGeoError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const coords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+        setUserLocation(coords);
+        setCercaDeMi(true);
+      },
+      (err) => {
+        setIsLocating(false);
+        console.warn('Error obteniendo geolocalización:', err);
+        if (err.code === 1) {
+          setGeoError('Permiso de GPS denegado. Habilita la ubicación en tu navegador.');
+        } else {
+          setGeoError('No se pudo obtener tu ubicación GPS actual.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  };
 
   // Handle locating a place from card to map
   const handleViewOnMap = (place: Lugar) => {
@@ -66,11 +158,26 @@ export default function DirectoryPage() {
     return places.filter(p => p.prioridad === 1 || p.origen === 'ubicame_cc').length;
   }, [places]);
 
+  const hasActiveFilters = Boolean(
+    selectedProvincia !== 'Santa Elena' || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || cercaDeMi || searchQuery
+  );
+
+  const clearAllFilters = () => {
+    setSelectedProvincia('Santa Elena');
+    setSelectedCanton('');
+    setSelectedParroquia('');
+    setSelectedComuna('');
+    setOnlyUbicameCc(false);
+    setCercaDeMi(false);
+    setUserLocation(null);
+    setSearchQuery('');
+  };
+
   return (
     <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col selection:bg-cyan-500/30">
       {/* Mobile-optimized Header */}
       <header className="sticky top-0 z-40 bg-[#050811]/90 backdrop-blur-md border-b border-slate-800/80">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 flex-shrink-0">
               <MapPin size={20} className="text-white" />
@@ -85,106 +192,308 @@ export default function DirectoryPage() {
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Olón • Montañita • Manglaralto
+                Provincia • Cantón • Parroquia • Comuna o Localidad
               </p>
             </div>
           </div>
 
-          <a
-            href="https://ubicame.cc"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-colors shadow-sm"
-            title="Ir a ubicame.cc para menús y cartas digitales"
-          >
-            <span>ubicame.cc</span>
-            <ExternalLink size={12} />
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://ubicame.cc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-colors shadow-sm"
+              title="Ir a ubicame.cc para menús y cartas digitales"
+            >
+              <span>ubicame.cc</span>
+              <ExternalLink size={12} />
+            </a>
+          </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-4 pb-28">
-        {/* Search & Filters Header */}
-        <div className="space-y-3 mb-4">
-          {/* Search Box */}
-          <div className="relative">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4 pb-28 space-y-4">
+        {/* Top Search & Actions */}
+        <div className="flex items-center gap-2">
+          {/* Main Search Input */}
+          <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
             <input
               type="text"
-              placeholder="Buscar restaurante, hotel, taxi, playa..."
+              placeholder="Buscar por negocio, provincia, cantón, parroquia, comuna..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 pl-10 pr-9 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+              className="w-full bg-slate-900/90 border border-slate-800 rounded-xl py-2.5 pl-10 pr-9 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all shadow-inner"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                title="Limpiar búsqueda"
               >
                 <X size={16} />
               </button>
             )}
           </div>
 
-          {/* Quick Zone Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {/* "Cerca de mí" GPS Button */}
+          <button
+            onClick={handleToggleCercaDeMi}
+            disabled={isLocating}
+            className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer flex-shrink-0 ${
+              cercaDeMi
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-emerald-500/20 border border-emerald-400'
+                : 'bg-slate-900 text-cyan-400 border border-cyan-500/40 hover:bg-slate-800'
+            }`}
+            title="Ordenar negocios por proximidad a tu ubicación GPS actual"
+          >
+            {isLocating ? (
+              <>
+                <Loader2 size={15} className="animate-spin text-cyan-300" />
+                <span className="hidden sm:inline">GPS...</span>
+              </>
+            ) : cercaDeMi ? (
+              <>
+                <Navigation size={14} className="rotate-45 text-white" />
+                <span>Cerca de mí</span>
+                <Check size={13} className="text-white" />
+              </>
+            ) : (
+              <>
+                <Compass size={15} />
+                <span>Cerca de mí</span>
+              </>
+            )}
+          </button>
+
+          {/* Toggle Territorial Dropdowns */}
+          <button
+            onClick={() => setShowGeoFilterBar(!showGeoFilterBar)}
+            className={`p-2.5 rounded-xl border text-xs font-medium transition-colors flex-shrink-0 cursor-pointer ${
+              showGeoFilterBar
+                ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+            }`}
+            title="Mostrar/Ocultar selectores por Provincia, Cantón, Parroquia y Comuna"
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+        </div>
+
+        {/* GPS Notifications */}
+        {geoError && (
+          <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between gap-2">
+            <span>{geoError}</span>
+            <button onClick={() => setGeoError(null)} className="text-amber-400 hover:text-white">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {cercaDeMi && userLocation && (
+          <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>
+                <strong>GPS Activo:</strong> Negocios y puntos clave ordenados por cercanía exacta a tu posición.
+              </span>
+            </div>
             <button
-              onClick={() => setSelectedZona(undefined)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border ${
-                selectedZona === undefined
+              onClick={handleToggleCercaDeMi}
+              className="text-xs text-slate-400 hover:text-white underline font-semibold cursor-pointer"
+            >
+              Desactivar
+            </button>
+          </div>
+        )}
+
+        {/* 4-LEVEL TERRITORIAL SELECTORS: Provincia, Cantón, Parroquia, Comuna */}
+        {showGeoFilterBar && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/95 to-slate-900/90 border border-slate-800 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+              <span className="text-xs font-black text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Map size={13} />
+                <span>División Territorial de Ecuador (4 Niveles)</span>
+              </span>
+
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-[11px] text-rose-400 hover:text-rose-300 font-bold transition-colors cursor-pointer"
+                >
+                  Restablecer
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 1. Provincia */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                  <Landmark size={12} className="text-indigo-400" />
+                  <span>1. Provincia</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedProvincia}
+                    onChange={(e) => {
+                      setSelectedProvincia(e.target.value);
+                      setSelectedCanton('');
+                      setSelectedParroquia('');
+                      setSelectedComuna('');
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 pr-8 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+                  >
+                    <option value="">Todas las Provincias</option>
+                    {PROVINCIAS_ECUADOR.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14} />
+                </div>
+              </div>
+
+              {/* 2. Cantón */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                  <Building size={12} className="text-cyan-400" />
+                  <span>2. Cantón</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedCanton}
+                    onChange={(e) => {
+                      setSelectedCanton(e.target.value);
+                      setSelectedParroquia('');
+                      setSelectedComuna('');
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 pr-8 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+                  >
+                    <option value="">Todos los Cantones</option>
+                    {availableCantones.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14} />
+                </div>
+              </div>
+
+              {/* 3. Parroquia */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                  <MapPin size={12} className="text-purple-400" />
+                  <span>3. Parroquia</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedParroquia}
+                    onChange={(e) => {
+                      setSelectedParroquia(e.target.value);
+                      setSelectedComuna('');
+                    }}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 pr-8 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+                  >
+                    <option value="">Todas las Parroquias</option>
+                    {availableParroquias.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14} />
+                </div>
+              </div>
+
+              {/* 4. Comuna o Localidad */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                  <Home size={12} className="text-emerald-400" />
+                  <span>4. Comuna o Localidad</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedComuna}
+                    onChange={(e) => setSelectedComuna(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 pr-8 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+                  >
+                    <option value="">Todas las Comunas</option>
+                    {availableComunas.map((comuna) => (
+                      <option key={comuna} value={comuna}>{comuna}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Selection Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedComuna('')}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
+              selectedComuna === ''
+                ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm shadow-cyan-500/20'
+                : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+            }`}
+          >
+            Todas las localidades
+          </button>
+          {availableComunas.slice(0, 10).map((comuna) => (
+            <button
+              key={comuna}
+              onClick={() => setSelectedComuna(selectedComuna === comuna ? '' : comuna)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border cursor-pointer ${
+                selectedComuna === comuna
                   ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm shadow-cyan-500/20'
                   : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
               }`}
             >
-              Todas las zonas
+              {comuna}
             </button>
-            {zonas.map((zona) => (
-              <button
-                key={zona}
-                onClick={() => setSelectedZona(selectedZona === zona ? undefined : zona)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border ${
-                  selectedZona === zona
-                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm shadow-cyan-500/20'
-                    : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
-                }`}
-              >
-                {zona}
-              </button>
-            ))}
+          ))}
 
-            {/* Toggle ubicame.cc clients */}
-            <button
-              onClick={() => setOnlyUbicameCc(!onlyUbicameCc)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1.5 ${
-                onlyUbicameCc
-                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/20'
-                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
-              }`}
-            >
-              <Sparkles size={12} />
-              <span>Con Menú ubicame.cc</span>
-            </button>
-          </div>
+          {/* Toggle ubicame.cc clients */}
+          <button
+            onClick={() => setOnlyUbicameCc(!onlyUbicameCc)}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1.5 cursor-pointer ${
+              onlyUbicameCc
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/20'
+                : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+            }`}
+          >
+            <Sparkles size={12} />
+            <span>Con Menú ubicame.cc</span>
+          </button>
+        </div>
 
-          {/* Result Count and View Summary */}
-          <div className="flex items-center justify-between text-xs text-slate-400 px-1">
-            <span>
-              Mostrando <strong className="text-white font-bold">{places.length}</strong> lugares
-              {totalClients > 0 && (
-                <span className="text-amber-400 ml-1">
-                  ({totalClients} con menú en vivo)
-                </span>
-              )}
-            </span>
-            <span className="text-slate-500">
-              {viewMode === 'list' ? 'Vista en acordeón' : 'Vista mapa interactivo'}
-            </span>
+        {/* Result Count and Active Territorial Path */}
+        <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+          <div>
+            Mostrando <strong className="text-white font-bold">{places.length}</strong> lugares
+            {totalClients > 0 && (
+              <span className="text-amber-400 ml-1">
+                ({totalClients} con menú en vivo)
+              </span>
+            )}
+            {(selectedComuna || selectedParroquia || selectedCanton) && (
+              <span className="text-cyan-400 ml-1 font-medium">
+                • {selectedComuna || selectedParroquia || selectedCanton}
+              </span>
+            )}
           </div>
+          <span className="text-slate-500">
+            {viewMode === 'list' ? 'Vista en acordeón' : 'Vista mapa interactivo'}
+          </span>
         </div>
 
         {/* Content Area: List vs Map */}
-        {viewMode === 'list' ? (
+        {loading ? (
+          <div className="py-20 text-center">
+            <Loader2 className="w-8 h-8 text-cyan-400 animate-spin mx-auto mb-2" />
+            <p className="text-xs text-slate-400">Cargando directorio georreferenciado...</p>
+          </div>
+        ) : viewMode === 'list' ? (
           <ZoneList
             lugares={places}
             onSelectPlace={(place) => handleViewOnMap(place)}
@@ -196,6 +505,7 @@ export default function DirectoryPage() {
               lugares={places}
               selectedPlace={selectedPlace}
               onSelectPlace={(place) => setSelectedPlace(place)}
+              userLocation={userLocation}
             />
           </div>
         )}
@@ -207,7 +517,7 @@ export default function DirectoryPage() {
           onClick={() => {
             setViewMode(viewMode === 'list' ? 'map' : 'list');
           }}
-          className="flex items-center gap-2 px-5 py-3 rounded-full font-bold text-sm bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-xl shadow-cyan-500/25 border border-cyan-400/40 hover:scale-105 active:scale-95 transition-transform"
+          className="flex items-center gap-2 px-5 py-3 rounded-full font-bold text-sm bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-xl shadow-cyan-500/25 border border-cyan-400/40 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
         >
           {viewMode === 'list' ? (
             <>

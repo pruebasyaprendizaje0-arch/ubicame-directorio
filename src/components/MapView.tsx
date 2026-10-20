@@ -5,11 +5,13 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Lugar } from '@/types/lugar';
+import { formatDistance } from '@/lib/geo';
 
 interface MapViewProps {
   lugares: Lugar[];
   selectedPlace?: Lugar | null;
   onSelectPlace?: (place: Lugar) => void;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 // Helper to sanitize icon path
@@ -67,8 +69,53 @@ function createCustomMarkerIcon(lugar: Lugar) {
   });
 }
 
-// Controller to smoothly pan to selected place
-function MapController({ selectedPlace }: { selectedPlace?: Lugar | null }) {
+// User GPS position pulsing marker
+function createUserMarkerIcon() {
+  const html = `
+    <div style="
+      position: relative;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <div style="
+        position: absolute;
+        width: 32px;
+        height: 32px;
+        background: rgba(14, 165, 233, 0.35);
+        border-radius: 50%;
+        animation: pulse 2s infinite ease-out;
+      "></div>
+      <div style="
+        position: relative;
+        width: 16px;
+        height: 16px;
+        background: #0284c7;
+        border: 2.5px solid #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(2, 132, 199, 0.8);
+      "></div>
+    </div>
+  `;
+
+  return L.divIcon({
+    className: 'custom-user-marker',
+    html,
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+// Controller to smoothly pan to selected place or user GPS
+function MapController({
+  selectedPlace,
+  userLocation,
+}: {
+  selectedPlace?: Lugar | null;
+  userLocation?: { lat: number; lng: number } | null;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -76,8 +123,12 @@ function MapController({ selectedPlace }: { selectedPlace?: Lugar | null }) {
       map.flyTo([selectedPlace.latitud, selectedPlace.longitud], 15, {
         duration: 1.2,
       });
+    } else if (userLocation) {
+      map.flyTo([userLocation.lat, userLocation.lng], 14, {
+        duration: 1.2,
+      });
     }
-  }, [selectedPlace, map]);
+  }, [selectedPlace, userLocation, map]);
 
   return null;
 }
@@ -86,15 +137,18 @@ export const MapView: React.FC<MapViewProps> = ({
   lugares,
   selectedPlace,
   onSelectPlace,
+  userLocation,
 }) => {
   // Center in coastal Santa Elena: Montañita / Olón / Manglaralto area (-1.82, -80.75)
-  const defaultCenter: [number, number] = [-1.82, -80.75];
+  const defaultCenter: [number, number] = userLocation
+    ? [userLocation.lat, userLocation.lng]
+    : [-1.82, -80.75];
 
   return (
     <div className="w-full h-full min-h-[480px] rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl relative">
       <MapContainer
         center={defaultCenter}
-        zoom={12}
+        zoom={userLocation ? 14 : 12}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', minHeight: '480px' }}
       >
@@ -104,7 +158,22 @@ export const MapView: React.FC<MapViewProps> = ({
           maxZoom={19}
         />
 
-        <MapController selectedPlace={selectedPlace} />
+        <MapController selectedPlace={selectedPlace} userLocation={userLocation} />
+
+        {/* User GPS location marker */}
+        {userLocation && (
+          <Marker
+            position={[userLocation.lat, userLocation.lng]}
+            icon={createUserMarkerIcon()}
+          >
+            <Popup className="custom-popup">
+              <div className="p-2 text-center">
+                <span className="font-bold text-xs text-sky-400">📍 Tu Ubicación Actual</span>
+                <p className="text-[11px] text-slate-300 mt-0.5">Mostrando negocios más cercanos</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
         {lugares.map((place) => {
           const isP1 = place.prioridad === 1 || place.origen === 'ubicame_cc';
@@ -120,43 +189,52 @@ export const MapView: React.FC<MapViewProps> = ({
                 click: () => onSelectPlace && onSelectPlace(place),
               }}
             >
-              <Popup className="custom-leaflet-popup">
-                <div style={{ minWidth: '220px', padding: '4px', color: '#0f172a' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', background: '#f1f5f9', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <img src={iconSrc} width="16" height="16" alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg'; }} />
+              <Popup className="custom-popup">
+                <div className="p-1 min-w-[200px] text-slate-900">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="w-7 h-7 rounded bg-slate-900 flex items-center justify-center flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={iconSrc}
+                        alt={place.tipo}
+                        className="w-4 h-4 invert object-contain"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg';
+                        }}
+                      />
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 'bold', lineHeight: 1.2 }}>
+                      <h4 className="font-bold text-xs leading-tight text-slate-950">
                         {place.nombre}
                       </h4>
-                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>
-                        {place.zona} • {place.tipo}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-cyan-700 font-semibold">
+                          {place.zona}, {place.ciudad}
+                        </span>
+                        {place.distancia_km !== undefined && (
+                          <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded">
+                            {formatDistance(place.distancia_km)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {isP1 && (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', borderRadius: '9999px', padding: '2px 8px', fontSize: '10.5px', fontWeight: 'bold', marginBottom: '8px' }}>
-                      ★ Destacado ubicame.cc
-                    </div>
-                  )}
-
                   {place.descripcion && (
-                    <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                    <p className="text-[11px] text-slate-600 line-clamp-2 mb-2 leading-relaxed">
                       {place.descripcion}
                     </p>
                   )}
 
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                  <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200">
                     {place.url_perfil && (
                       <a
                         href={place.url_perfil}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ flex: 1, textAlign: 'center', background: '#d97706', color: '#fff', textDecoration: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}
+                        className="flex-1 py-1 px-2 rounded text-[10.5px] font-bold bg-amber-500 text-slate-950 text-center hover:bg-amber-400 transition-colors"
                       >
-                        Ver Menú ↗
+                        Ver Menú
                       </a>
                     )}
                     {place.whatsapp && (
@@ -164,7 +242,7 @@ export const MapView: React.FC<MapViewProps> = ({
                         href={`https://wa.me/${place.whatsapp.replace(/\+/g, '')}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ flex: 1, textAlign: 'center', background: '#16a34a', color: '#fff', textDecoration: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}
+                        className="flex-1 py-1 px-2 rounded text-[10.5px] font-semibold bg-emerald-600 text-white text-center hover:bg-emerald-500 transition-colors"
                       >
                         WhatsApp
                       </a>

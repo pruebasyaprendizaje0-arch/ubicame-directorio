@@ -3,9 +3,11 @@ export interface Lugar {
   nombre: string;
   tipo: string;
   icono: string;           // ej: "restaurante.svg", "playa.svg", "bar.svg", "farmacia.svg", "taxi.svg"
-  provincia: string;
-  ciudad: string;
-  zona: string;            // ej: "Olón", "Montañita", "Manglaralto"
+  provincia: string;       // ej: "Santa Elena", "Guayas"
+  ciudad: string;          // Cantón / Ciudad ej: "Santa Elena", "Salinas"
+  zona: string;            // Comuna o Parroquia ej: "Olón", "Montañita", "Manglaralto", "Cadeate", "Ayangue"
+  parroquia?: string;      // Parroquia específica (ej: "Manglaralto", "Colonche")
+  comuna?: string;         // Comuna / Localidad específica
   latitud: number;
   longitud: number;
   es_referencia: boolean;
@@ -17,11 +19,20 @@ export interface Lugar {
   estado: 'activo' | 'pendiente';
   descripcion?: string;
   foto_url?: string;
+  distancia_km?: number;   // Calculado dinámicamente si se activa "Cerca de mí"
 }
 
 export interface PlaceFilters {
   search?: string;
+  provincia?: string;
+  canton?: string;
+  ciudad?: string;
+  parroquia?: string;
+  comuna?: string;
   zona?: string;
   tipo?: string;
   solo_ubicame_cc?: boolean;
+  cerca_de_mi?: boolean;
+  user_lat?: number;
+  user_lng?: number;
 }

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Lugar } from '@/types/lugar';
+import { formatDistance } from '@/lib/geo';
 import { MapPin, MessageCircle, ExternalLink, Navigation, Sparkles, ShieldCheck } from 'lucide-react';
 
 interface PlaceCardProps {
@@ -57,9 +58,18 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
             >
               {place.nombre}
             </h3>
-            <div className="flex items-center gap-1.5 text-xs text-cyan-400 mt-0.5">
-              <MapPin size={12} className="flex-shrink-0" />
-              <span>{place.zona}, {place.ciudad}</span>
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs text-cyan-400 mt-0.5">
+              <div className="flex items-center gap-1">
+                <MapPin size={12} className="flex-shrink-0" />
+                <span>{place.zona}, {place.ciudad}</span>
+              </div>
+
+              {place.distancia_km !== undefined && (
+                <span className="inline-flex items-center gap-1 font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded text-[11px] border border-emerald-500/30">
+                  <Navigation size={10} className="rotate-45" />
+                  <span>{formatDistance(place.distancia_km)}</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -120,25 +130,25 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
           </a>
         )}
 
-        {/* Ver en Mapa */}
+        {/* Ver en Mapa Local */}
         {onViewOnMap && (
           <button
             onClick={() => onViewOnMap(place)}
-            className="py-1.5 px-2.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors flex items-center gap-1"
-            title="Ubicar en el mapa"
+            className="inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+            title="Ubicar en el mapa interactivo"
           >
             <MapPin size={13} />
-            <span className="hidden sm:inline">Mapa</span>
+            <span>Mapa</span>
           </button>
         )}
 
-        {/* GPS */}
+        {/* Navegación GPS Externa (Google Maps) */}
         <a
           href={googleMapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="py-1.5 px-2.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors flex items-center gap-1"
-          title="Cómo llegar con GPS"
+          className="inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-800 text-cyan-300 hover:text-cyan-200 hover:bg-slate-700 transition-colors"
+          title="Cómo llegar con Google Maps"
         >
           <Navigation size={13} />
           <span>GPS</span>

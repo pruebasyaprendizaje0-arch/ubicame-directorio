@@ -1,16 +1,34 @@
 import { Lugar, PlaceFilters } from '@/types/lugar';
 import localLugares from '@/data/lugares.json';
 import { getDbPool } from '@/lib/db';
+import {
+  calculateDistanceKm,
+  COMUNAS_LOCALIDADES_SANTA_ELENA,
+  PARROQUIAS_SANTA_ELENA,
+  CANTONES_SANTA_ELENA,
+} from '@/lib/geo';
 import fs from 'fs';
 import path from 'path';
 
 /**
  * Función de ordenamiento requerida por las reglas de negocio:
- * 1. prioridad ASC (1 = Cliente ubicame.cc arriba)
- * 2. es_referencia DESC (Puntos de referencia antes que regulares del mismo rango)
- * 3. nombre ASC (Alfabético)
+ * 1. Si está activo "cerca_de_mi", ordena por distancia ascendente
+ * 2. Si no, prioridad ASC (1 = Cliente ubicame.cc arriba)
+ * 3. es_referencia DESC (Puntos de referencia antes que regulares del mismo rango)
+ * 4. nombre ASC (Alfabético)
  */
-export function sortLugares(list: Lugar[]): Lugar[] {
+export function sortLugares(list: Lugar[], cercaDeMi: boolean = false): Lugar[] {
+  if (cercaDeMi) {
+    return [...list].sort((a, b) => {
+      const distA = a.distancia_km ?? 999999;
+      const distB = b.distancia_km ?? 999999;
+      if (Math.abs(distA - distB) > 0.05) {
+        return distA - distB;
+      }
+      return a.prioridad - b.prioridad;
+    });
+  }
+
   return [...list].sort((a, b) => {
     if (a.prioridad !== b.prioridad) {
       return a.prioridad - b.prioridad;
@@ -59,32 +77,65 @@ const shouldUsePostgres = Boolean(
 );
 
 /**
- * Obtener todos los lugares activos aplicando filtros opcionales
+ * Obtener todos los lugares activos aplicando filtros jerárquicos y/o "Cerca de mí"
  */
 export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
+  let results: Lugar[] = [];
+
   if (shouldUsePostgres) {
     try {
-      return await getLugaresFromPostgres(filters);
+      results = await getLugaresFromPostgres(filters);
     } catch (err) {
       console.warn('⚠️ [placesService] Error conectando a PostgreSQL, usando fallback local:', err);
+      results = readLocalFile().filter(p => p.estado === 'activo');
     }
+  } else {
+    results = readLocalFile().filter(p => p.estado === 'activo');
   }
 
-  let results: Lugar[] = readLocalFile().filter(p => p.estado === 'activo');
-
+  // Filtrado en memoria (aplica siempre para fallback o refinamiento)
   if (filters?.search) {
     const q = filters.search.toLowerCase().trim();
     results = results.filter(
       p =>
         p.nombre.toLowerCase().includes(q) ||
         p.tipo.toLowerCase().includes(q) ||
-        p.zona.toLowerCase().includes(q) ||
+        (p.provincia && p.provincia.toLowerCase().includes(q)) ||
+        (p.ciudad && p.ciudad.toLowerCase().includes(q)) ||
+        (p.zona && p.zona.toLowerCase().includes(q)) ||
+        (p.parroquia && p.parroquia.toLowerCase().includes(q)) ||
+        (p.comuna && p.comuna.toLowerCase().includes(q)) ||
         (p.descripcion && p.descripcion.toLowerCase().includes(q))
     );
   }
 
-  if (filters?.zona) {
-    results = results.filter(p => p.zona.toLowerCase() === filters.zona!.toLowerCase());
+  if (filters?.provincia) {
+    const prov = filters.provincia.toLowerCase();
+    results = results.filter(p => (p.provincia || '').toLowerCase() === prov);
+  }
+
+  if (filters?.canton || filters?.ciudad) {
+    const cant = (filters.canton || filters.ciudad)!.toLowerCase();
+    results = results.filter(p => (p.ciudad || '').toLowerCase() === cant);
+  }
+
+  if (filters?.parroquia) {
+    const parr = filters.parroquia.toLowerCase();
+    results = results.filter(
+      p =>
+        (p.parroquia && p.parroquia.toLowerCase() === parr) ||
+        (p.zona && p.zona.toLowerCase() === parr)
+    );
+  }
+
+  if (filters?.comuna || filters?.zona) {
+    const com = (filters.comuna || filters.zona)!.toLowerCase();
+    results = results.filter(
+      p =>
+        (p.zona && p.zona.toLowerCase() === com) ||
+        (p.comuna && p.comuna.toLowerCase() === com) ||
+        p.nombre.toLowerCase().includes(com)
+    );
   }
 
   if (filters?.tipo) {
@@ -95,7 +146,29 @@ export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
     results = results.filter(p => p.prioridad === 1 || p.origen === 'ubicame_cc');
   }
 
-  return sortLugares(results);
+  // Cálculo de distancia si se solicitó "Cerca de mí" con coordenadas del usuario
+  const hasUserCoords =
+    typeof filters?.user_lat === 'number' &&
+    typeof filters?.user_lng === 'number' &&
+    !isNaN(filters.user_lat) &&
+    !isNaN(filters.user_lng);
+
+  if (hasUserCoords) {
+    results = results.map(place => {
+      const dist = calculateDistanceKm(
+        filters!.user_lat!,
+        filters!.user_lng!,
+        place.latitud,
+        place.longitud
+      );
+      return {
+        ...place,
+        distancia_km: dist,
+      };
+    });
+  }
+
+  return sortLugares(results, Boolean(filters?.cerca_de_mi && hasUserCoords));
 }
 
 /**
@@ -122,11 +195,31 @@ export async function getAllAdminLugares(): Promise<Lugar[]> {
 }
 
 /**
- * Obtener listado único de zonas (Olón, Montañita, Manglaralto, Cadeate, etc.)
+ * Catálogos geográficos únicos para alimentar los selectores de búsqueda
  */
+export async function getProvincias(): Promise<string[]> {
+  const lugares = await getAllAdminLugares();
+  const set = new Set<string>();
+  lugares.forEach(p => { if (p.provincia) set.add(p.provincia); });
+  if (set.size === 0) set.add('Santa Elena');
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+export async function getCantones(): Promise<string[]> {
+  const lugares = await getAllAdminLugares();
+  const set = new Set<string>(CANTONES_SANTA_ELENA);
+  lugares.forEach(p => { if (p.ciudad) set.add(p.ciudad); });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+export async function getParroquias(): Promise<string[]> {
+  return [...PARROQUIAS_SANTA_ELENA].sort((a, b) => a.localeCompare(b, 'es'));
+}
+
 export async function getZonas(): Promise<string[]> {
-  const lugares = await getLugares();
-  const set = new Set(lugares.map(p => p.zona));
+  const lugares = await getAllAdminLugares();
+  const set = new Set<string>(COMUNAS_LOCALIDADES_SANTA_ELENA);
+  lugares.forEach(p => { if (p.zona) set.add(p.zona); });
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
@@ -200,7 +293,7 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
   const updated: Lugar = {
     ...currentList[index],
     ...updates,
-    id_slug: slug, // El id_slug se conserva
+    id_slug: slug,
   };
 
   currentList[index] = updated;
@@ -340,6 +433,8 @@ async function getLugaresFromPostgres(filters?: PlaceFilters): Promise<Lugar[]> 
     conditions.push(`(
       LOWER(nombre) LIKE $${idx} OR
       LOWER(tipo) LIKE $${idx} OR
+      LOWER(provincia) LIKE $${idx} OR
+      LOWER(ciudad) LIKE $${idx} OR
       LOWER(zona) LIKE $${idx} OR
       LOWER(descripcion) LIKE $${idx}
     )`);
@@ -347,9 +442,21 @@ async function getLugaresFromPostgres(filters?: PlaceFilters): Promise<Lugar[]> 
     idx++;
   }
 
-  if (filters?.zona) {
-    conditions.push(`LOWER(zona) = LOWER($${idx++})`);
-    values.push(filters.zona);
+  if (filters?.provincia) {
+    conditions.push(`LOWER(provincia) = LOWER($${idx++})`);
+    values.push(filters.provincia);
+  }
+
+  if (filters?.canton || filters?.ciudad) {
+    conditions.push(`LOWER(ciudad) = LOWER($${idx++})`);
+    values.push(filters.canton || filters.ciudad);
+  }
+
+  if (filters?.zona || filters?.comuna) {
+    conditions.push(`(LOWER(zona) = LOWER($${idx}) OR LOWER(nombre) LIKE $${idx + 1})`);
+    values.push((filters.zona || filters.comuna)!.toLowerCase());
+    values.push(`%${(filters.zona || filters.comuna)!.toLowerCase()}%`);
+    idx += 2;
   }
 
   if (filters?.tipo) {

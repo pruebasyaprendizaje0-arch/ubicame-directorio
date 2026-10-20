@@ -9,6 +9,7 @@ interface DynamicMapProps {
   lugares: Lugar[];
   selectedPlace?: Lugar | null;
   onSelectPlace?: (place: Lugar) => void;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 // Carga dinámica de Leaflet sin SSR para evitar errores de referencia 'window'

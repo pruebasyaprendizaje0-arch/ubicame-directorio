@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ShieldAlert,
   Building2,
@@ -10,6 +10,8 @@ import {
   Globe,
   ExternalLink,
   Plus,
+  LogOut,
+  UserCheck,
 } from 'lucide-react';
 
 interface AdminHeaderProps {
@@ -18,9 +20,21 @@ interface AdminHeaderProps {
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ onNewPlace }) => {
   const pathname = usePathname();
+  const router = useRouter();
 
   const isPlacesActive = pathname === '/admin/lugares' || pathname === '/admin';
   const isImportActive = pathname === '/admin/importar';
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth/logout', { method: 'POST' });
+      router.push('/admin/login');
+      router.refresh();
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err);
+      router.push('/admin/login');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-[#060a17]/95 backdrop-blur-md border-b border-slate-800">
@@ -71,7 +85,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onNewPlace }) => {
           </Link>
         </nav>
 
-        {/* Right: Actions */}
+        {/* Right: User Identity & Actions */}
         <div className="flex items-center gap-2">
           {onNewPlace && (
             <button
@@ -85,22 +99,28 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onNewPlace }) => {
 
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
             title="Ver Directorio Público"
           >
             <Globe size={13} />
-            <span className="hidden md:inline">Ver Directorio</span>
+            <span>Ver Directorio</span>
           </Link>
 
-          <a
-            href="https://ubicame.cc"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition-colors"
+          {/* User Badge */}
+          <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 text-xs font-medium">
+            <UserCheck size={13} className="text-emerald-400" />
+            <span className="text-[11px] truncate max-w-[130px]">pruebasyaprendizaje0</span>
+          </div>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 hover:bg-rose-900/60 transition-colors cursor-pointer"
+            title="Cerrar Sesión de Super Admin"
           >
-            <span>ubicame.cc</span>
-            <ExternalLink size={12} />
-          </a>
+            <LogOut size={13} />
+            <span className="hidden sm:inline">Salir</span>
+          </button>
         </div>
       </div>
     </header>
