@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllAdminLugares, createLugar } from '@/services/placesService';
 import { Lugar } from '@/types/lugar';
+import { getCoordinatesForPlace } from '@/lib/geo';
 
 export const runtime = 'nodejs';
 
@@ -39,6 +40,16 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
 
+    const coords = getCoordinatesForPlace(
+      body.zona,
+      body.parroquia,
+      body.ciudad,
+      body.provincia,
+      body.latitud,
+      body.longitud,
+      slugBase
+    );
+
     const newLugar: Lugar = {
       id_slug: slugBase,
       nombre: body.nombre.trim(),
@@ -47,8 +58,8 @@ export async function POST(request: NextRequest) {
       provincia: body.provincia || 'Santa Elena',
       ciudad: body.ciudad || 'Santa Elena',
       zona: body.zona.trim(),
-      latitud: typeof body.latitud === 'number' ? body.latitud : -1.82,
-      longitud: typeof body.longitud === 'number' ? body.longitud : -80.75,
+      latitud: coords.lat,
+      longitud: coords.lng,
       es_referencia: Boolean(body.es_referencia),
       es_servicio: Boolean(body.es_servicio),
       prioridad: Number(body.prioridad) || 3,

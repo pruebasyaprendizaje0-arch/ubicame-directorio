@@ -102,15 +102,15 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
         </p>
       )}
 
-      {/* Action Buttons Row */}
-      <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+      {/* Action Buttons Row: 2x2 grid on small screens, horizontal flex on tablets/PC */}
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 pt-2.5 border-t border-slate-800/80">
         {/* Enlace directo al Menú en ubicame.cc */}
         {place.url_perfil && (
           <a
             href={place.url_perfil}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 transition-colors shadow-sm"
+            className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 sm:py-1.5 px-2.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 active:scale-95 transition-all shadow-sm"
           >
             <span>Ver Menú</span>
             <ExternalLink size={12} />
@@ -123,7 +123,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white transition-colors"
+            className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 sm:py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white active:scale-95 transition-all"
           >
             <MessageCircle size={13} />
             <span>WhatsApp</span>
@@ -134,7 +134,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
         {onViewOnMap && (
           <button
             onClick={() => onViewOnMap(place)}
-            className="inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 sm:py-1.5 px-3 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
             title="Ubicar en el mapa interactivo"
           >
             <MapPin size={13} />
@@ -147,7 +147,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
           href={googleMapsUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-800 text-cyan-300 hover:text-cyan-200 hover:bg-slate-700 transition-colors"
+          className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 sm:py-1.5 px-3 rounded-lg text-xs font-semibold bg-slate-800 text-cyan-300 hover:text-cyan-200 hover:bg-slate-700 active:scale-95 transition-all"
           title="Cómo llegar con Google Maps"
         >
           <Navigation size={13} />

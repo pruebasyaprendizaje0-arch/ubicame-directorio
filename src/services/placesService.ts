@@ -7,13 +7,18 @@ import {
   COMUNAS_LOCALIDADES_SANTA_ELENA,
   PARROQUIAS_SANTA_ELENA,
   CANTONES_SANTA_ELENA,
+  getCoordinatesForPlace,
 } from '@/lib/geo';
 import fs from 'fs';
 import path from 'path';
 import { fetchUbicameCcBusinesses } from '@/lib/ubicameSync';
 
 let cachedUbicameBusinesses: { data: Lugar[]; timestamp: number } | null = null;
-const UBICAME_CACHE_TTL_MS = 20000; // 20 segundos de caché en memoria
+const UBICAME_CACHE_TTL_MS = 5000; // 5 segundos de caché en memoria para sincronización en tiempo real
+
+export function invalidateUbicameCache(): void {
+  cachedUbicameBusinesses = null;
+}
 
 async function getLiveUbicameBusinesses(): Promise<Lugar[]> {
   const now = Date.now();
@@ -133,53 +138,55 @@ export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
     // Continuar con los lugares locales
   }
 
+function normalizeText(text?: string | null): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
   // Filtrado en memoria (aplica siempre para fallback o refinamiento)
   if (filters?.search) {
-    const q = filters.search.toLowerCase().trim();
-    results = results.filter(
-      p =>
-        p.nombre.toLowerCase().includes(q) ||
-        p.tipo.toLowerCase().includes(q) ||
-        (p.provincia && p.provincia.toLowerCase().includes(q)) ||
-        (p.ciudad && p.ciudad.toLowerCase().includes(q)) ||
-        (p.zona && p.zona.toLowerCase().includes(q)) ||
-        (p.parroquia && p.parroquia.toLowerCase().includes(q)) ||
-        (p.comuna && p.comuna.toLowerCase().includes(q)) ||
-        (p.descripcion && p.descripcion.toLowerCase().includes(q))
-    );
+    const q = normalizeText(filters.search);
+    results = results.filter(p => {
+      const target = normalizeText(
+        `${p.nombre} ${p.tipo} ${p.provincia || ''} ${p.ciudad || ''} ${p.zona || ''} ${p.parroquia || ''} ${p.comuna || ''} ${p.descripcion || ''}`
+      );
+      return target.includes(q);
+    });
   }
 
   if (filters?.provincia) {
-    const prov = filters.provincia.toLowerCase();
-    results = results.filter(p => (p.provincia || '').toLowerCase() === prov);
+    const prov = normalizeText(filters.provincia);
+    results = results.filter(p => normalizeText(p.provincia) === prov);
   }
 
   if (filters?.canton || filters?.ciudad) {
-    const cant = (filters.canton || filters.ciudad)!.toLowerCase();
-    results = results.filter(p => (p.ciudad || '').toLowerCase() === cant);
+    const cant = normalizeText(filters.canton || filters.ciudad);
+    results = results.filter(p => normalizeText(p.ciudad) === cant);
   }
 
   if (filters?.parroquia) {
-    const parr = filters.parroquia.toLowerCase();
+    const parr = normalizeText(filters.parroquia);
     results = results.filter(
-      p =>
-        (p.parroquia && p.parroquia.toLowerCase() === parr) ||
-        (p.zona && p.zona.toLowerCase() === parr)
+      p => normalizeText(p.parroquia) === parr || normalizeText(p.zona) === parr
     );
   }
 
   if (filters?.comuna || filters?.zona) {
-    const com = (filters.comuna || filters.zona)!.toLowerCase();
+    const com = normalizeText(filters.comuna || filters.zona);
     results = results.filter(
       p =>
-        (p.zona && p.zona.toLowerCase() === com) ||
-        (p.comuna && p.comuna.toLowerCase() === com) ||
-        p.nombre.toLowerCase().includes(com)
+        normalizeText(p.zona) === com ||
+        normalizeText(p.comuna) === com ||
+        normalizeText(p.nombre).includes(com)
     );
   }
 
   if (filters?.tipo) {
-    results = results.filter(p => p.tipo.toLowerCase() === filters.tipo!.toLowerCase());
+    results = results.filter(p => normalizeText(p.tipo) === normalizeText(filters.tipo));
   }
 
   if (filters?.solo_ubicame_cc) {
@@ -353,8 +360,23 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
   const index = currentList.findIndex(p => p.id_slug === slug);
   if (index === -1) return null;
 
+  const current = currentList[index];
+  if (updates.latitud !== undefined || updates.longitud !== undefined || updates.zona || updates.ciudad || updates.provincia) {
+    const coords = getCoordinatesForPlace(
+      updates.zona || current.zona,
+      updates.parroquia || current.parroquia,
+      updates.ciudad || current.ciudad,
+      updates.provincia || current.provincia,
+      updates.latitud !== undefined ? updates.latitud : current.latitud,
+      updates.longitud !== undefined ? updates.longitud : current.longitud,
+      slug
+    );
+    updates.latitud = coords.lat;
+    updates.longitud = coords.lng;
+  }
+
   const updated: Lugar = {
-    ...currentList[index],
+    ...current,
     ...updates,
     id_slug: slug,
   };
@@ -389,8 +411,21 @@ export async function deleteLugar(slug: string): Promise<boolean> {
 
 /**
  * Crear un nuevo lugar individualmente (Super Admin)
+ * Garantiza que siempre tenga latitud y longitud válidas
  */
 export async function createLugar(data: Lugar): Promise<Lugar> {
+  const coords = getCoordinatesForPlace(
+    data.zona || data.comuna,
+    data.parroquia,
+    data.ciudad,
+    data.provincia,
+    data.latitud,
+    data.longitud,
+    data.id_slug
+  );
+  data.latitud = coords.lat;
+  data.longitud = coords.lng;
+
   if (shouldUsePostgres) {
     try {
       const pool = await getPgPool();

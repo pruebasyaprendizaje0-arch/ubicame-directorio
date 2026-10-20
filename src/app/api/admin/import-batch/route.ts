@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Lugar } from '@/types/lugar';
 import { getDbPool } from '@/lib/db';
+import { getCoordinatesForPlace } from '@/lib/geo';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,6 +49,16 @@ export async function POST(request: NextRequest) {
           let paramIdx = 1;
 
           for (const item of chunk) {
+            const coords = getCoordinatesForPlace(
+              item.zona || item.comuna,
+              item.parroquia,
+              item.ciudad,
+              item.provincia,
+              item.latitud,
+              item.longitud,
+              item.id_slug
+            );
+
             const rowParams: string[] = [];
             for (let c = 0; c < 18; c++) {
               rowParams.push(`$${paramIdx++}`);
@@ -62,8 +73,8 @@ export async function POST(request: NextRequest) {
               item.provincia || 'Santa Elena',
               item.ciudad || 'Santa Elena',
               item.zona || 'Olón',
-              typeof item.latitud === 'number' && !isNaN(item.latitud) ? item.latitud : null,
-              typeof item.longitud === 'number' && !isNaN(item.longitud) ? item.longitud : null,
+              coords.lat,
+              coords.lng,
               Boolean(item.es_referencia),
               Boolean(item.es_servicio),
               Number(item.prioridad) || 3,
@@ -133,8 +144,19 @@ export async function POST(request: NextRequest) {
       currentLugares.forEach(p => placesMap.set(p.id_slug, p));
 
       for (const item of lugares) {
+        const coords = getCoordinatesForPlace(
+          item.zona || item.comuna,
+          item.parroquia,
+          item.ciudad,
+          item.provincia,
+          item.latitud,
+          item.longitud,
+          item.id_slug
+        );
         placesMap.set(item.id_slug, {
           ...item,
+          latitud: coords.lat,
+          longitud: coords.lng,
           icono: item.icono || 'lugar.svg',
           provincia: item.provincia || 'Santa Elena',
           ciudad: item.ciudad || 'Santa Elena',

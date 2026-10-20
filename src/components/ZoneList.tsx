@@ -9,12 +9,14 @@ interface ZoneListProps {
   lugares: Lugar[];
   onSelectPlace?: (place: Lugar) => void;
   onViewOnMap?: (place: Lugar) => void;
+  isSplitView?: boolean;
 }
 
 export const ZoneList: React.FC<ZoneListProps> = ({
   lugares,
   onSelectPlace,
   onViewOnMap,
+  isSplitView = false,
 }) => {
   // Group lugares by zona
   const groupedByZone = lugares.reduce<Record<string, Lugar[]>>((acc, lugar) => {
@@ -93,7 +95,13 @@ export const ZoneList: React.FC<ZoneListProps> = ({
 
             {/* Accordion Body */}
             {isOpen && (
-              <div className="p-3.5 sm:p-4 pt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                className={`p-3.5 sm:p-4 pt-2 grid gap-3 ${
+                  isSplitView
+                    ? 'grid-cols-1 md:grid-cols-2'
+                    : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                }`}
+              >
                 {zonePlaces.map((place) => (
                   <PlaceCard
                     key={place.id_slug}

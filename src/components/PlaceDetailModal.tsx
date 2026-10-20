@@ -1,25 +1,53 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, MapPin, MessageCircle, ExternalLink, Navigation, Check, Share2, Crown, Shield } from 'lucide-react';
-import { Lugar } from '@/types/place';
+import {
+  X,
+  MapPin,
+  MessageCircle,
+  ExternalLink,
+  Navigation,
+  Check,
+  Share2,
+  Sparkles,
+  ShieldCheck,
+  Landmark,
+  Wrench,
+  Building,
+} from 'lucide-react';
+import { Lugar } from '@/types/lugar';
+import { formatDistance } from '@/lib/geo';
 
 interface PlaceDetailModalProps {
   place: Lugar | null;
   onClose: () => void;
+  onViewOnMap?: (place: Lugar) => void;
 }
 
-export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({ place, onClose }) => {
+export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
+  place,
+  onClose,
+  onViewOnMap,
+}) => {
   const [copied, setCopied] = useState(false);
 
   if (!place) return null;
 
   const isUbicameClient = place.prioridad === 1 || place.origen === 'ubicame_cc';
+  const isVerified = place.prioridad === 2;
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitud},${place.longitud}`;
-  const whatsappUrl = place.whatsapp ? `https://wa.me/${place.whatsapp.replace(/\+/g, '')}` : undefined;
+  const whatsappUrl = place.whatsapp
+    ? `https://wa.me/${place.whatsapp.replace(/\+/g, '')}`
+    : undefined;
+
+  const iconSrc =
+    place.icono.startsWith('/') || place.icono.startsWith('http')
+      ? place.icono
+      : `/icons/${place.icono}`;
 
   const handleShare = () => {
-    const shareUrl = `${window.location.origin}/?slug=${place.id_slug}`;
+    if (typeof window === 'undefined') return;
+    const shareUrl = `${window.location.origin}/?q=${encodeURIComponent(place.nombre)}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(shareUrl);
       setCopied(true);
@@ -28,115 +56,132 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({ place, onClo
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
-        <button className="modal-close-btn" onClick={onClose} aria-label="Cerrar modal">
-          <X size={20} />
+    <div
+      className="fixed inset-0 z-50 bg-[#040711]/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="w-full max-w-lg bg-[#0d1322] border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          aria-label="Cerrar modal"
+        >
+          <X size={18} />
         </button>
 
-        <div className="modal-header-row">
-          <div className="icon-badge">
+        {/* Header with Icon, Name & Location */}
+        <div className="flex items-start gap-3.5 mb-4 pr-8">
+          <div
+            className={`w-13 h-13 rounded-2xl flex items-center justify-center flex-shrink-0 border p-2.5 ${
+              isUbicameClient
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                : 'bg-slate-800 border-slate-700 text-cyan-400'
+            }`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={place.icono || '/icons/lugar.svg'}
+              src={iconSrc}
               alt={place.tipo}
-              width={28}
-              height={28}
+              className="w-full h-full invert object-contain"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg';
               }}
             />
           </div>
+
           <div>
-            <h2 className="modal-title">{place.nombre}</h2>
-            <p className="modal-subtitle">
-              {place.tipo} • {place.zona}, {place.ciudad}
-            </p>
+            <h2 className="text-lg sm:text-xl font-black text-white leading-tight">
+              {place.nombre}
+            </h2>
+            <div className="flex items-center gap-1.5 text-xs text-cyan-400 mt-1">
+              <MapPin size={13} className="flex-shrink-0 text-cyan-400" />
+              <span>
+                {place.zona}, {place.ciudad} ({place.provincia})
+              </span>
+            </div>
+            {place.distancia_km !== undefined && (
+              <span className="inline-block mt-1 font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded text-[11px] border border-emerald-500/30">
+                {formatDistance(place.distancia_km)}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Priority & Status tags */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+        {/* Badges / Badging Row */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
           {isUbicameClient && (
-            <span className="badge badge-gold">
-              <Crown size={12} />
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 border border-amber-500/40 text-amber-300">
+              <Sparkles size={12} className="text-amber-400" />
               <span>Cliente Oficial ubicame.cc (P1)</span>
             </span>
           )}
-          {place.prioridad === 2 && (
-            <span className="badge badge-cyan">
-              <Shield size={12} />
-              <span>Verificado (P2)</span>
+          {isVerified && !isUbicameClient && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/15 border border-cyan-500/40 text-cyan-300">
+              <ShieldCheck size={12} />
+              <span>Verificado</span>
             </span>
           )}
           {place.es_referencia && (
-            <span className="badge badge-purple">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/15 border border-purple-500/40 text-purple-300">
+              <Landmark size={12} />
               <span>Punto de Referencia</span>
             </span>
           )}
           {place.es_servicio && (
-            <span className="badge badge-emerald">
-              <span>Servicio Esencial</span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300">
+              <Wrench size={12} />
+              <span>Servicio de Urgencia</span>
             </span>
           )}
-          <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>
-            ID: {place.id_slug}
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/60">
+            {place.tipo}
           </span>
         </div>
 
         {/* Description */}
         {place.descripcion && (
-          <p style={{ color: '#cbd5e1', fontSize: '14.5px', lineHeight: '1.6', marginBottom: '20px' }}>
+          <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 text-xs sm:text-sm leading-relaxed mb-4">
             {place.descripcion}
-          </p>
+          </div>
         )}
 
-        {/* Coordenadas & Map Visualizer */}
-        <div className="modal-map-preview">
-          <div className="modal-map-grid" />
-          <div className="modal-pin">
-            <MapPin size={16} />
-            <span>{place.latitud.toFixed(4)}, {place.longitud.toFixed(4)}</span>
+        {/* 4-Level Territorial Breakdown */}
+        <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 mb-5 text-xs">
+          <div>
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Provincia</span>
+            <div className="font-semibold text-white mt-0.5">{place.provincia}</div>
           </div>
-          <span style={{ fontSize: '11px', color: '#94a3b8', zIndex: 1 }}>
-            Coordenadas GPS georreferenciadas
-          </span>
-        </div>
-
-        {/* Details Grid */}
-        <div className="modal-details-grid">
-          <div className="modal-detail-item">
-            <div className="modal-detail-label">Provincia</div>
-            <div className="modal-detail-val">{place.provincia}</div>
+          <div>
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Cantón</span>
+            <div className="font-semibold text-white mt-0.5">{place.ciudad}</div>
           </div>
-          <div className="modal-detail-item">
-            <div className="modal-detail-label">Ciudad</div>
-            <div className="modal-detail-val">{place.ciudad}</div>
+          <div>
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Parroquia</span>
+            <div className="font-semibold text-white mt-0.5">{place.parroquia || 'Manglaralto'}</div>
           </div>
-          <div className="modal-detail-item">
-            <div className="modal-detail-label">Zona / Sector</div>
-            <div className="modal-detail-val">{place.zona}</div>
-          </div>
-          <div className="modal-detail-item">
-            <div className="modal-detail-label">Origen de Datos</div>
-            <div className="modal-detail-val">
-              {place.origen === 'ubicame_cc' ? 'PostgreSQL ubicame.cc' : 'Directorio ubicame.info'}
-            </div>
+          <div>
+            <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Comuna / Sector</span>
+            <div className="font-semibold text-white mt-0.5">{place.comuna || place.zona}</div>
           </div>
         </div>
 
-        {/* Action Buttons in Modal */}
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        {/* Action Buttons: 2x2 grid on mobile, responsive row on desktop */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-2 border-t border-slate-800">
           {place.url_perfil && (
             <a
               href={place.url_perfil}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-primary"
-              style={{ flex: 1, justifyContent: 'center' }}
+              className="col-span-2 sm:flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 active:scale-95 transition-all shadow-md"
             >
-              <span>Ver Menú en ubicame.cc</span>
-              <ExternalLink size={15} />
+              <span>Ver Menú Digital</span>
+              <ExternalLink size={13} />
             </a>
           )}
 
@@ -145,11 +190,10 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({ place, onClo
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-card-action btn-whatsapp"
-              style={{ flex: 1, padding: '12px' }}
+              className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white active:scale-95 transition-all"
             >
-              <MessageCircle size={16} />
-              <span>Contactar WhatsApp</span>
+              <MessageCircle size={14} />
+              <span>WhatsApp</span>
             </a>
           )}
 
@@ -157,21 +201,32 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({ place, onClo
             href={googleMapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-card-action btn-directions"
-            style={{ padding: '12px 18px' }}
-            title="Abrir en Google Maps"
+            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-300 hover:text-white hover:bg-slate-700 active:scale-95 transition-all"
+            title="Cómo llegar con Google Maps"
           >
-            <Navigation size={16} />
-            <span>Navegar GPS</span>
+            <Navigation size={14} />
+            <span>GPS</span>
           </a>
+
+          {onViewOnMap && (
+            <button
+              onClick={() => {
+                onViewOnMap(place);
+                onClose();
+              }}
+              className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
+            >
+              <MapPin size={14} />
+              <span>Ver Mapa</span>
+            </button>
+          )}
 
           <button
             onClick={handleShare}
-            className="btn-card-action btn-directions"
-            style={{ padding: '12px 18px' }}
+            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
             title="Copiar enlace"
           >
-            {copied ? <Check size={16} color="#10b981" /> : <Share2 size={16} />}
+            {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
             <span>{copied ? 'Copiado' : 'Compartir'}</span>
           </button>
         </div>
@@ -179,3 +234,5 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({ place, onClo
     </div>
   );
 };
+
+export default PlaceDetailModal;

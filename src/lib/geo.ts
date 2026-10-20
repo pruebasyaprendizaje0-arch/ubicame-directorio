@@ -700,3 +700,241 @@ export function inferHierarchy(text: string): {
 
   return {};
 }
+
+/**
+ * Catálogo exhaustivo de coordenadas georreferenciadas de Ecuador
+ * (Comunas, Cantones, Parroquias y Capitales Provinciales)
+ */
+export const ECUADOR_COORDINATES_CATALOG: Record<string, { lat: number; lng: number }> = {
+  // Santa Elena - Comunas y Localidades
+  'montañita': { lat: -1.8267, lng: -80.7533 },
+  'olón': { lat: -1.7983, lng: -80.7542 },
+  'olon': { lat: -1.7983, lng: -80.7542 },
+  'manglaralto': { lat: -1.8500, lng: -80.7440 },
+  'cadeate': { lat: -1.8700, lng: -80.7300 },
+  'curía': { lat: -1.7750, lng: -80.7580 },
+  'curia': { lat: -1.7750, lng: -80.7580 },
+  'san josé': { lat: -1.7400, lng: -80.7600 },
+  'san jose': { lat: -1.7400, lng: -80.7600 },
+  'las núñez': { lat: -1.7050, lng: -80.7650 },
+  'las nunez': { lat: -1.7050, lng: -80.7650 },
+  'la entrada': { lat: -1.6800, lng: -80.7700 },
+  'san antonio': { lat: -1.9000, lng: -80.7200 },
+  'libertador bolívar': { lat: -1.9300, lng: -80.7100 },
+  'libertador bolivar': { lat: -1.9300, lng: -80.7100 },
+  'valdivia': { lat: -1.9500, lng: -80.7150 },
+  'san pedro': { lat: -1.9700, lng: -80.7180 },
+  'ayangue': { lat: -1.9850, lng: -80.7480 },
+  'palmar': { lat: -2.0200, lng: -80.7300 },
+  'colonche': { lat: -2.0000, lng: -80.6800 },
+  'dos mangas': { lat: -1.8450, lng: -80.6800 },
+  'sinchal': { lat: -1.8600, lng: -80.6900 },
+  'barcelona': { lat: -1.8750, lng: -80.7000 },
+  'ballenita': { lat: -2.2050, lng: -80.8750 },
+  'santa elena': { lat: -2.2260, lng: -80.8580 },
+  'salinas': { lat: -2.2180, lng: -80.9570 },
+  'chipipe': { lat: -2.2120, lng: -80.9630 },
+  'san lorenzo': { lat: -2.2050, lng: -80.9550 },
+  'la libertad': { lat: -2.2330, lng: -80.9100 },
+  'punta carnero': { lat: -2.2850, lng: -80.9100 },
+  'ancón': { lat: -2.3250, lng: -80.8650 },
+  'ancon': { lat: -2.3250, lng: -80.8650 },
+  'chanduy': { lat: -2.4000, lng: -80.6800 },
+
+  // Manabí
+  'manta': { lat: -0.9676, lng: -80.7089 },
+  'barbasquillo': { lat: -0.9548, lng: -80.7482 },
+  'tarqui': { lat: -0.9550, lng: -80.7000 },
+  'los esteros': { lat: -0.9500, lng: -80.6850 },
+  'san mateo': { lat: -0.9700, lng: -80.8000 },
+  'portoviejo': { lat: -1.0544, lng: -80.4545 },
+  'puerto lópez': { lat: -1.5560, lng: -80.8120 },
+  'puerto lopez': { lat: -1.5560, lng: -80.8120 },
+  'salango': { lat: -1.5900, lng: -80.8400 },
+  'machalilla': { lat: -1.4850, lng: -80.7700 },
+  'pedernales': { lat: 0.0716, lng: -80.0525 },
+  'bahía de caráquez': { lat: -0.6000, lng: -80.4250 },
+  'bahia de caraquez': { lat: -0.6000, lng: -80.4250 },
+  'canoa': { lat: -0.4600, lng: -80.4550 },
+  'san vicente': { lat: -0.5900, lng: -80.4100 },
+  'crucita': { lat: -0.8700, lng: -80.5350 },
+  'chone': { lat: -0.6970, lng: -80.0930 },
+  'jipijapa': { lat: -1.3480, lng: -80.5790 },
+  'montecristi': { lat: -1.0500, lng: -80.6600 },
+
+  // Guayas
+  'guayaquil': { lat: -2.1894, lng: -79.8891 },
+  'samborondón': { lat: -2.0910, lng: -79.7240 },
+  'samborondon': { lat: -2.0910, lng: -79.7240 },
+  'la puntilla': { lat: -2.1550, lng: -79.8650 },
+  'daule': { lat: -1.8640, lng: -79.9780 },
+  'la aurora': { lat: -2.0500, lng: -79.9200 },
+  'general villamil': { lat: -2.6310, lng: -80.3880 },
+  'playas': { lat: -2.6310, lng: -80.3880 },
+  'durán': { lat: -2.1700, lng: -79.8300 },
+  'duran': { lat: -2.1700, lng: -79.8300 },
+  'milagro': { lat: -2.1340, lng: -79.5940 },
+
+  // Pichincha
+  'quito': { lat: -0.1807, lng: -78.4678 },
+  'cumbayá': { lat: -0.2010, lng: -78.4320 },
+  'cumbaya': { lat: -0.2010, lng: -78.4320 },
+  'tumbaco': { lat: -0.2150, lng: -78.4000 },
+  'los chillos': { lat: -0.2800, lng: -78.4500 },
+
+  // Azuay
+  'cuenca': { lat: -2.9001, lng: -79.0059 },
+
+  // Esmeraldas
+  'esmeraldas': { lat: 0.9682, lng: -79.6517 },
+  'atacames': { lat: 0.8700, lng: -79.8450 },
+  'tonsupa': { lat: 0.8850, lng: -79.8150 },
+  'mompiche': { lat: 0.5000, lng: -80.0200 },
+  'same': { lat: 0.8350, lng: -79.8800 },
+
+  // Otras Provincias y Capitales
+  'ambato': { lat: -1.2491, lng: -78.6168 },
+  'tungurahua': { lat: -1.2491, lng: -78.6168 },
+  'baños de agua santa': { lat: -1.3960, lng: -78.4230 },
+  'ibarra': { lat: 0.3517, lng: -78.1223 },
+  'imbabura': { lat: 0.3517, lng: -78.1223 },
+  'otavalo': { lat: 0.2330, lng: -78.2620 },
+  'riobamba': { lat: -1.6635, lng: -78.6546 },
+  'chimborazo': { lat: -1.6635, lng: -78.6546 },
+  'latacunga': { lat: -0.9333, lng: -78.6167 },
+  'cotopaxi': { lat: -0.9333, lng: -78.6167 },
+  'loja': { lat: -3.9931, lng: -79.2042 },
+  'vilcabamba': { lat: -4.2600, lng: -79.2220 },
+  'machala': { lat: -3.2581, lng: -79.9554 },
+  'el oro': { lat: -3.2581, lng: -79.9554 },
+  'santo domingo': { lat: -0.2530, lng: -79.1754 },
+  'santo domingo de los tsáchilas': { lat: -0.2530, lng: -79.1754 },
+  'babahoyo': { lat: -1.8022, lng: -79.5344 },
+  'los ríos': { lat: -1.8022, lng: -79.5344 },
+  'quevedo': { lat: -1.0286, lng: -79.4635 },
+  'tulcán': { lat: 0.8122, lng: -77.7173 },
+  'carchi': { lat: 0.8122, lng: -77.7173 },
+  'guaranda': { lat: -1.5926, lng: -79.0009 },
+  'bolívar': { lat: -1.5926, lng: -79.0009 },
+  'azogues': { lat: -2.7397, lng: -78.8475 },
+  'cañar': { lat: -2.7397, lng: -78.8475 },
+  'puyo': { lat: -1.4842, lng: -77.9984 },
+  'pastaza': { lat: -1.4842, lng: -77.9984 },
+  'tena': { lat: -0.9938, lng: -77.8129 },
+  'napo': { lat: -0.9938, lng: -77.8129 },
+  'macas': { lat: -2.3087, lng: -78.1114 },
+  'morona santiago': { lat: -2.3087, lng: -78.1114 },
+  'el coca': { lat: -0.4665, lng: -76.9878 },
+  'orellana': { lat: -0.4665, lng: -76.9878 },
+  'lago agrio': { lat: 0.0847, lng: -76.8828 },
+  'nueva loja': { lat: 0.0847, lng: -76.8828 },
+  'sucumbíos': { lat: 0.0847, lng: -76.8828 },
+  'zamora': { lat: -4.0692, lng: -78.9567 },
+  'zamora chinchipe': { lat: -4.0692, lng: -78.9567 },
+  'galápagos': { lat: -0.7432, lng: -90.3138 },
+  'puerto ayora': { lat: -0.7432, lng: -90.3138 },
+  'santa cruz': { lat: -0.7432, lng: -90.3138 },
+  'san cristóbal': { lat: -0.9022, lng: -89.6094 },
+  'puerto baquerizo moreno': { lat: -0.9022, lng: -89.6094 },
+  'isabela': { lat: -0.9554, lng: -90.9664 },
+  'puerto villamil': { lat: -0.9554, lng: -90.9664 },
+};
+
+/**
+ * Resuelve y garantiza coordenadas exactas (latitud y longitud válidas)
+ * para cualquier negocio registrado en ubicame.cc o creado en el sistema.
+ * Si las coordenadas ya existen y son válidas, las conserva.
+ * Si están vacías o son nulas, las infiere por comuna, cantón o provincia.
+ * Aplica un micro-desplazamiento determinista para evitar colisiones exactas en el mapa.
+ */
+export function getCoordinatesForPlace(
+  comuna?: string,
+  parroquia?: string,
+  canton?: string,
+  provincia?: string,
+  rawLat?: any,
+  rawLng?: any,
+  slugForJitter?: string
+): { lat: number; lng: number } {
+  const parsedLat = rawLat != null ? parseFloat(rawLat) : NaN;
+  const parsedLng = rawLng != null ? parseFloat(rawLng) : NaN;
+
+  if (!isNaN(parsedLat) && !isNaN(parsedLng) && parsedLat !== 0 && parsedLng !== 0) {
+    return { lat: parsedLat, lng: parsedLng };
+  }
+
+  // Buscar por orden de especificidad: comuna -> parroquia -> cantón -> provincia
+  const candidates = [
+    comuna?.toLowerCase().trim(),
+    parroquia?.toLowerCase().trim(),
+    canton?.toLowerCase().trim(),
+    provincia?.toLowerCase().trim(),
+  ].filter(Boolean) as string[];
+
+  let baseCoord: { lat: number; lng: number } | null = null;
+
+  for (const candidate of candidates) {
+    if (ECUADOR_COORDINATES_CATALOG[candidate]) {
+      baseCoord = ECUADOR_COORDINATES_CATALOG[candidate];
+      break;
+    }
+  }
+
+  // Fallback predeterminado a Santa Elena / Montañita si no se encontró
+  if (!baseCoord) {
+    baseCoord = { lat: -1.8267, lng: -80.7533 };
+  }
+
+  // Desplazamiento determinista sutil (~30-50m) para evitar que negocios en la misma comuna se tapen
+  let jitterLat = 0;
+  let jitterLng = 0;
+  if (slugForJitter) {
+    let hash = 0;
+    for (let i = 0; i < slugForJitter.length; i++) {
+      hash = (hash << 5) - hash + slugForJitter.charCodeAt(i);
+      hash |= 0;
+    }
+    const offsetLat = ((Math.abs(hash) % 100) - 50) * 0.000008;
+    const offsetLng = ((Math.abs(hash >> 3) % 100) - 50) * 0.000008;
+    jitterLat = offsetLat;
+    jitterLng = offsetLng;
+  }
+
+  return {
+    lat: Number((baseCoord.lat + jitterLat).toFixed(6)),
+    lng: Number((baseCoord.lng + jitterLng).toFixed(6)),
+  };
+}
+
+/**
+ * Infiere la provincia y el cantón de Ecuador a partir de un texto libre
+ * (nombre de ciudad, cantón, parroquia, comuna o fragmento de dirección).
+ */
+export function inferProvinceAndCanton(query?: string | null): { provincia?: string; canton?: string } | null {
+  if (!query) return null;
+  const q = query.toLowerCase().trim();
+  if (q.length < 2) return null;
+
+  for (const [prov, cantones] of Object.entries(DIVISION_TERRITORIAL_ECUADOR)) {
+    if (prov.toLowerCase() === q || q.includes(prov.toLowerCase())) {
+      return { provincia: prov };
+    }
+    for (const [canton, parroquias] of Object.entries(cantones)) {
+      if (canton.toLowerCase() === q || q.includes(canton.toLowerCase())) {
+        return { provincia: prov, canton };
+      }
+      for (const [parroquia, comunas] of Object.entries(parroquias)) {
+        if (parroquia.toLowerCase() === q || q.includes(parroquia.toLowerCase())) {
+          return { provincia: prov, canton };
+        }
+        for (const comuna of comunas) {
+          if (comuna.toLowerCase() === q || q.includes(comuna.toLowerCase())) {
+            return { provincia: prov, canton };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
