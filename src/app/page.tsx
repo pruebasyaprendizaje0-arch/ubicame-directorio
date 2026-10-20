@@ -40,7 +40,7 @@ export default function DirectoryPage() {
 
   // Search & 4-Level Territorial Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProvincia, setSelectedProvincia] = useState<string>('Santa Elena');
+  const [selectedProvincia, setSelectedProvincia] = useState<string>('');
   const [selectedCanton, setSelectedCanton] = useState<string>('');
   const [selectedParroquia, setSelectedParroquia] = useState<string>('');
   const [selectedComuna, setSelectedComuna] = useState<string>('');
@@ -159,11 +159,11 @@ export default function DirectoryPage() {
   }, [places]);
 
   const hasActiveFilters = Boolean(
-    selectedProvincia !== 'Santa Elena' || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || cercaDeMi || searchQuery
+    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || cercaDeMi || searchQuery
   );
 
   const clearAllFilters = () => {
-    setSelectedProvincia('Santa Elena');
+    setSelectedProvincia('');
     setSelectedCanton('');
     setSelectedParroquia('');
     setSelectedComuna('');
@@ -345,7 +345,7 @@ export default function DirectoryPage() {
                     }}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 pr-8 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
                   >
-                    <option value="">Todas las Provincias</option>
+                    <option value="">Todas las Provincias ({PROVINCIAS_ECUADOR.length})</option>
                     {PROVINCIAS_ECUADOR.map((p) => (
                       <option key={p} value={p}>{p}</option>
                     ))}

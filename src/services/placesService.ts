@@ -3,6 +3,7 @@ import localLugares from '@/data/lugares.json';
 import { getDbPool } from '@/lib/db';
 import {
   calculateDistanceKm,
+  PROVINCIAS_ECUADOR,
   COMUNAS_LOCALIDADES_SANTA_ELENA,
   PARROQUIAS_SANTA_ELENA,
   CANTONES_SANTA_ELENA,
@@ -198,10 +199,9 @@ export async function getAllAdminLugares(): Promise<Lugar[]> {
  * Catálogos geográficos únicos para alimentar los selectores de búsqueda
  */
 export async function getProvincias(): Promise<string[]> {
+  const set = new Set<string>(PROVINCIAS_ECUADOR);
   const lugares = await getAllAdminLugares();
-  const set = new Set<string>();
   lugares.forEach(p => { if (p.provincia) set.add(p.provincia); });
-  if (set.size === 0) set.add('Santa Elena');
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
 }
 
