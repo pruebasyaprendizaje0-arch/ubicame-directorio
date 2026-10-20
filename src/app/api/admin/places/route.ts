@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAllAdminLugares, createLugar } from '@/services/placesService';
 import { Lugar } from '@/types/lugar';
 
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     const lugares = await getAllAdminLugares();

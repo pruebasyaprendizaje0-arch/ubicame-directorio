@@ -1,5 +1,6 @@
 import { Lugar, PlaceFilters } from '@/types/lugar';
 import localLugares from '@/data/lugares.json';
+import { getDbPool } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
@@ -299,37 +300,31 @@ export async function createLugar(data: Lugar): Promise<Lugar> {
 /**
  * Conexión a PostgreSQL compartido con ubicame.cc en Producción
  */
-let poolInstance: any = null;
-
-async function getPgPool() {
-  if (!poolInstance) {
-    const { Pool } = await import('pg');
-    poolInstance = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-    });
-  }
-  return poolInstance;
+function getPgPool() {
+  return getDbPool();
 }
 
 function mapRowToLugar(row: any): Lugar {
+  const latParsed = row.latitud != null ? parseFloat(row.latitud) : NaN;
+  const lngParsed = row.longitud != null ? parseFloat(row.longitud) : NaN;
+
   return {
     id_slug: row.id_slug,
     nombre: row.nombre,
     tipo: row.tipo,
     icono: row.icono || 'lugar.svg',
-    provincia: row.provincia,
-    ciudad: row.ciudad,
-    zona: row.zona,
-    latitud: parseFloat(row.latitud),
-    longitud: parseFloat(row.longitud),
+    provincia: row.provincia || 'Santa Elena',
+    ciudad: row.ciudad || 'Santa Elena',
+    zona: row.zona || 'Olón',
+    latitud: !isNaN(latParsed) ? latParsed : -1.82,
+    longitud: !isNaN(lngParsed) ? lngParsed : -80.75,
     es_referencia: Boolean(row.es_referencia),
     es_servicio: Boolean(row.es_servicio),
-    prioridad: parseInt(row.prioridad, 10),
-    origen: row.origen,
+    prioridad: parseInt(row.prioridad, 10) || 3,
+    origen: row.origen || 'directorio_info',
     whatsapp: row.whatsapp || undefined,
     url_perfil: row.url_perfil || undefined,
-    estado: row.estado,
+    estado: row.estado || 'activo',
     descripcion: row.descripcion || undefined,
     foto_url: row.foto_url || undefined,
   };

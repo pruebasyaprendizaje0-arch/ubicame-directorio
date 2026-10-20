@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Lugar } from '@/types/lugar';
+import { getDbPool } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
+
+export const runtime = 'nodejs';
 
 /**
  * Endpoint Super Admin: Importación masiva por lotes (Batch UPSERT)
@@ -28,14 +31,10 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     if (hasPostgres) {
-      // 1. Inserción directa en PostgreSQL mediante transacciones y chunks de 50
-      const { Pool } = await import('pg');
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-      });
-
+      // 1. Inserción optimizada multi-fila en PostgreSQL con transacción y pool singleton
+      const pool = getDbPool();
       const client = await pool.connect();
+
       try {
         await client.query('BEGIN');
 
@@ -44,38 +43,18 @@ export async function POST(request: NextRequest) {
           const chunk = lugares.slice(i, i + chunkSize);
           chunksCount++;
 
-          for (const item of chunk) {
-            const query = `
-              INSERT INTO lugares (
-                id_slug, nombre, tipo, icono, provincia, ciudad, zona,
-                latitud, longitud, es_referencia, es_servicio, prioridad,
-                origen, whatsapp, url_perfil, estado, descripcion, foto_url
-              ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7,
-                $8, $9, $10, $11, $12,
-                $13, $14, $15, $16, $17, $18
-              )
-              ON CONFLICT (id_slug) DO UPDATE SET
-                nombre = EXCLUDED.nombre,
-                tipo = EXCLUDED.tipo,
-                icono = EXCLUDED.icono,
-                provincia = EXCLUDED.provincia,
-                ciudad = EXCLUDED.ciudad,
-                zona = EXCLUDED.zona,
-                latitud = EXCLUDED.latitud,
-                longitud = EXCLUDED.longitud,
-                es_referencia = EXCLUDED.es_referencia,
-                es_servicio = EXCLUDED.es_servicio,
-                prioridad = EXCLUDED.prioridad,
-                origen = EXCLUDED.origen,
-                whatsapp = EXCLUDED.whatsapp,
-                url_perfil = EXCLUDED.url_perfil,
-                estado = EXCLUDED.estado,
-                descripcion = EXCLUDED.descripcion,
-                foto_url = EXCLUDED.foto_url;
-            `;
+          const valueRows: string[] = [];
+          const values: any[] = [];
+          let paramIdx = 1;
 
-            const values = [
+          for (const item of chunk) {
+            const rowParams: string[] = [];
+            for (let c = 0; c < 18; c++) {
+              rowParams.push(`$${paramIdx++}`);
+            }
+            valueRows.push(`(${rowParams.join(', ')})`);
+
+            values.push(
               item.id_slug,
               item.nombre,
               item.tipo,
@@ -94,11 +73,37 @@ export async function POST(request: NextRequest) {
               item.estado === 'pendiente' ? 'pendiente' : 'activo',
               item.descripcion || null,
               item.foto_url || null,
-            ];
-
-            await client.query(query, values);
-            processedCount++;
+            );
           }
+
+          const query = `
+            INSERT INTO lugares (
+              id_slug, nombre, tipo, icono, provincia, ciudad, zona,
+              latitud, longitud, es_referencia, es_servicio, prioridad,
+              origen, whatsapp, url_perfil, estado, descripcion, foto_url
+            ) VALUES ${valueRows.join(',\n')}
+            ON CONFLICT (id_slug) DO UPDATE SET
+              nombre = EXCLUDED.nombre,
+              tipo = EXCLUDED.tipo,
+              icono = EXCLUDED.icono,
+              provincia = EXCLUDED.provincia,
+              ciudad = EXCLUDED.ciudad,
+              zona = EXCLUDED.zona,
+              latitud = EXCLUDED.latitud,
+              longitud = EXCLUDED.longitud,
+              es_referencia = EXCLUDED.es_referencia,
+              es_servicio = EXCLUDED.es_servicio,
+              prioridad = EXCLUDED.prioridad,
+              origen = EXCLUDED.origen,
+              whatsapp = EXCLUDED.whatsapp,
+              url_perfil = EXCLUDED.url_perfil,
+              estado = EXCLUDED.estado,
+              descripcion = EXCLUDED.descripcion,
+              foto_url = EXCLUDED.foto_url;
+          `;
+
+          await client.query(query, values);
+          processedCount += chunk.length;
         }
 
         await client.query('COMMIT');
