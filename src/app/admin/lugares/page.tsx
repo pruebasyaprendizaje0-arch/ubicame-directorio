@@ -33,6 +33,28 @@ export default function AdminPlacesPage() {
   const [editPlace, setEditPlace] = useState<Lugar | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewPlace, setIsNewPlace] = useState(false);
+  const [syncingUbicame, setSyncingUbicame] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  // Sync with ubicame.cc
+  const handleSyncUbicame = async () => {
+    setSyncingUbicame(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch('/api/admin/sync-ubicame', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setSyncMessage(`¡Sincronización exitosa! ${data.data.syncedCount} negocios de ubicame.cc integrados.`);
+        await loadPlaces();
+      } else {
+        setSyncMessage(`Aviso: ${data.error || 'No se pudo completar la sincronización'}`);
+      }
+    } catch (err: any) {
+      setSyncMessage(`Error de conexión al sincronizar con ubicame.cc: ${err.message}`);
+    } finally {
+      setSyncingUbicame(false);
+    }
+  };
 
   // Load places
   const loadPlaces = async () => {
@@ -151,14 +173,43 @@ export default function AdminPlacesPage() {
             </p>
           </div>
 
-          <button
-            onClick={handleNew}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-          >
-            <Plus size={16} />
-            <span>Agregar Negocio o Referencia</span>
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              onClick={handleSyncUbicame}
+              disabled={syncingUbicame}
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-amber-500/10 text-amber-300 border border-amber-500/40 hover:bg-amber-500/20 active:scale-95 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+              title="Sincronizar negocios registrados en la plataforma ubicame.cc"
+            >
+              <RefreshCw size={14} className={syncingUbicame ? 'animate-spin text-amber-400' : 'text-amber-400'} />
+              <span>{syncingUbicame ? 'Sincronizando...' : 'Sincronizar ubicame.cc'}</span>
+            </button>
+
+            <button
+              onClick={handleNew}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Plus size={16} />
+              <span>Agregar Negocio o Referencia</span>
+            </button>
+          </div>
         </div>
+
+        {/* Sync Feedback Notification Banner */}
+        {syncMessage && (
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between shadow-sm animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} className="text-amber-400 flex-shrink-0" />
+              <span>{syncMessage}</span>
+            </div>
+            <button
+              onClick={() => setSyncMessage(null)}
+              className="text-amber-400/70 hover:text-white px-2 py-0.5 rounded cursor-pointer font-bold text-sm"
+              aria-label="Cerrar notificación"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

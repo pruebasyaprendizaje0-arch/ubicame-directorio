@@ -10,6 +10,27 @@ import {
 } from '@/lib/geo';
 import fs from 'fs';
 import path from 'path';
+import { fetchUbicameCcBusinesses } from '@/lib/ubicameSync';
+
+let cachedUbicameBusinesses: { data: Lugar[]; timestamp: number } | null = null;
+const UBICAME_CACHE_TTL_MS = 20000; // 20 segundos de caché en memoria
+
+async function getLiveUbicameBusinesses(): Promise<Lugar[]> {
+  const now = Date.now();
+  if (cachedUbicameBusinesses && now - cachedUbicameBusinesses.timestamp < UBICAME_CACHE_TTL_MS) {
+    return cachedUbicameBusinesses.data;
+  }
+  try {
+    const live = await fetchUbicameCcBusinesses();
+    if (live && live.length > 0) {
+      cachedUbicameBusinesses = { data: live, timestamp: now };
+      return live;
+    }
+  } catch (err) {
+    // Si no está disponible, continuar silenciosamente
+  }
+  return cachedUbicameBusinesses?.data || [];
+}
 
 /**
  * Función de ordenamiento requerida por las reglas de negocio:
@@ -94,6 +115,24 @@ export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
     results = readLocalFile().filter(p => p.estado === 'activo');
   }
 
+  // Fusionar con negocios en vivo de ubicame.cc si están disponibles
+  try {
+    const liveUbicame = await getLiveUbicameBusinesses();
+    if (liveUbicame.length > 0) {
+      const map = new Map<string, Lugar>();
+      results.forEach(p => map.set(p.id_slug, p));
+      liveUbicame.forEach(u => {
+        if (u.estado === 'activo') {
+          const existing = map.get(u.id_slug);
+          map.set(u.id_slug, existing ? { ...existing, ...u } : u);
+        }
+      });
+      results = Array.from(map.values());
+    }
+  } catch (e) {
+    // Continuar con los lugares locales
+  }
+
   // Filtrado en memoria (aplica siempre para fallback o refinamiento)
   if (filters?.search) {
     const q = filters.search.toLowerCase().trim();
@@ -176,6 +215,8 @@ export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
  * Obtener TODOS los lugares para el Super Admin (incluye pendientes e inactivos)
  */
 export async function getAllAdminLugares(): Promise<Lugar[]> {
+  let results: Lugar[] = [];
+
   if (shouldUsePostgres) {
     try {
       const pool = await getPgPool();
@@ -186,13 +227,29 @@ export async function getAllAdminLugares(): Promise<Lugar[]> {
         FROM lugares
         ORDER BY prioridad ASC, es_referencia DESC, nombre ASC
       `);
-      return res.rows.map(mapRowToLugar);
+      results = res.rows.map(mapRowToLugar);
     } catch (err) {
       console.warn('Error al consultar lugares admin en Postgres, usando fallback local:', err);
+      results = readLocalFile();
     }
+  } else {
+    results = readLocalFile();
   }
 
-  return sortLugares(readLocalFile());
+  try {
+    const liveUbicame = await getLiveUbicameBusinesses();
+    if (liveUbicame.length > 0) {
+      const map = new Map<string, Lugar>();
+      results.forEach(p => map.set(p.id_slug, p));
+      liveUbicame.forEach(u => {
+        const existing = map.get(u.id_slug);
+        map.set(u.id_slug, existing ? { ...existing, ...u } : u);
+      });
+      results = Array.from(map.values());
+    }
+  } catch (e) {}
+
+  return sortLugares(results);
 }
 
 /**
@@ -227,6 +284,12 @@ export async function getZonas(): Promise<string[]> {
  * Obtener un lugar por su id_slug único
  */
 export async function getLugarBySlug(slug: string): Promise<Lugar | null> {
+  try {
+    const liveUbicame = await getLiveUbicameBusinesses();
+    const liveMatch = liveUbicame.find(p => p.id_slug === slug);
+    if (liveMatch) return liveMatch;
+  } catch (e) {}
+
   if (shouldUsePostgres) {
     try {
       const pool = await getPgPool();
