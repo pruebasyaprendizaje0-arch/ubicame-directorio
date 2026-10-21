@@ -20,6 +20,9 @@ export interface Lugar {
   descripcion?: string;
   foto_url?: string;
   distancia_km?: number;   // Calculado dinámicamente si se activa "Cerca de mí"
+  email_propietario?: string;
+  nombre_propietario?: string;
+  exactitud_gps?: 'rooftop' | 'interpolated' | 'approximate' | string;
 }
 
 export interface PlaceFilters {

@@ -16,6 +16,7 @@ export interface Lugar {
   url_perfil?: string;       // Enlace a su landing/menú en ubicame.cc
   estado: 'activo' | 'pendiente';
   descripcion?: string;
+  exactitud_gps?: 'rooftop' | 'interpolated' | 'approximate' | string;
 }
 
 export interface PlaceFilters {

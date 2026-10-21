@@ -129,7 +129,21 @@ export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
       liveUbicame.forEach(u => {
         if (u.estado === 'activo') {
           const existing = map.get(u.id_slug);
-          map.set(u.id_slug, existing ? { ...existing, ...u } : u);
+          if (existing) {
+            // Unir dando prioridad estricta a las coordenadas satelitales y ediciones locales
+            map.set(u.id_slug, {
+              ...u,
+              ...existing,
+              latitud: existing.latitud !== undefined && !isNaN(existing.latitud) ? existing.latitud : u.latitud,
+              longitud: existing.longitud !== undefined && !isNaN(existing.longitud) ? existing.longitud : u.longitud,
+              foto_url: existing.foto_url || u.foto_url,
+              descripcion: existing.descripcion || u.descripcion,
+              email_propietario: existing.email_propietario || u.email_propietario,
+              nombre_propietario: existing.nombre_propietario || u.nombre_propietario,
+            });
+          } else {
+            map.set(u.id_slug, u);
+          }
         }
       });
       results = Array.from(map.values());
@@ -250,7 +264,19 @@ export async function getAllAdminLugares(): Promise<Lugar[]> {
       results.forEach(p => map.set(p.id_slug, p));
       liveUbicame.forEach(u => {
         const existing = map.get(u.id_slug);
-        map.set(u.id_slug, existing ? { ...existing, ...u } : u);
+        if (existing) {
+          map.set(u.id_slug, {
+            ...u,
+            ...existing,
+            latitud: existing.latitud !== undefined && !isNaN(existing.latitud) ? existing.latitud : u.latitud,
+            longitud: existing.longitud !== undefined && !isNaN(existing.longitud) ? existing.longitud : u.longitud,
+            exactitud_gps: existing.exactitud_gps || u.exactitud_gps,
+            foto_url: existing.foto_url || u.foto_url,
+            descripcion: existing.descripcion || u.descripcion,
+          });
+        } else {
+          map.set(u.id_slug, u);
+        }
       });
       results = Array.from(map.values());
     }
@@ -291,11 +317,7 @@ export async function getZonas(): Promise<string[]> {
  * Obtener un lugar por su id_slug único
  */
 export async function getLugarBySlug(slug: string): Promise<Lugar | null> {
-  try {
-    const liveUbicame = await getLiveUbicameBusinesses();
-    const liveMatch = liveUbicame.find(p => p.id_slug === slug);
-    if (liveMatch) return liveMatch;
-  } catch (e) {}
+  let basePlace: Lugar | null = null;
 
   if (shouldUsePostgres) {
     try {
@@ -304,14 +326,39 @@ export async function getLugarBySlug(slug: string): Promise<Lugar | null> {
         `SELECT * FROM lugares WHERE id_slug = $1 LIMIT 1`,
         [slug]
       );
-      if (res.rows.length > 0) return mapRowToLugar(res.rows[0]);
+      if (res.rows.length > 0) basePlace = mapRowToLugar(res.rows[0]);
     } catch (err) {
       console.warn('Error en getLugarBySlug Postgres, usando local:', err);
     }
   }
 
-  const lugares = readLocalFile();
-  return lugares.find(p => p.id_slug === slug) || null;
+  if (!basePlace) {
+    const lugares = readLocalFile();
+    basePlace = lugares.find(p => p.id_slug === slug) || null;
+  }
+
+  try {
+    const liveUbicame = await getLiveUbicameBusinesses();
+    const liveMatch = liveUbicame.find(p => p.id_slug === slug);
+    if (liveMatch) {
+      if (basePlace) {
+        return {
+          ...liveMatch,
+          ...basePlace,
+          latitud: basePlace.latitud !== undefined && !isNaN(basePlace.latitud) ? basePlace.latitud : liveMatch.latitud,
+          longitud: basePlace.longitud !== undefined && !isNaN(basePlace.longitud) ? basePlace.longitud : liveMatch.longitud,
+          exactitud_gps: basePlace.exactitud_gps || liveMatch.exactitud_gps,
+          foto_url: basePlace.foto_url || liveMatch.foto_url,
+          descripcion: basePlace.descripcion || liveMatch.descripcion,
+          email_propietario: basePlace.email_propietario || liveMatch.email_propietario,
+          nombre_propietario: basePlace.nombre_propietario || liveMatch.nombre_propietario,
+        };
+      }
+      return liveMatch;
+    }
+  } catch (e) {}
+
+  return basePlace;
 }
 
 /**
@@ -330,6 +377,14 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
         'latitud', 'longitud', 'es_referencia', 'es_servicio', 'prioridad',
         'origen', 'whatsapp', 'url_perfil', 'estado', 'descripcion', 'foto_url'
       ];
+
+      if (updates.email_propietario && (!updates.descripcion || !updates.descripcion.includes(updates.email_propietario))) {
+        const existing = await getLugarBySlug(slug);
+        const oldDesc = existing?.descripcion || '';
+        if (!oldDesc.includes(updates.email_propietario)) {
+          updates.descripcion = `${oldDesc} | Cuenta Google: ${updates.nombre_propietario || ''} <${updates.email_propietario}> (Verificada)`.trim();
+        }
+      }
 
       for (const key of allowedFields) {
         if ((updates as any)[key] !== undefined) {
@@ -357,10 +412,20 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
 
   // Actualización local
   const currentList = readLocalFile();
-  const index = currentList.findIndex(p => p.id_slug === slug);
-  if (index === -1) return null;
+  let index = currentList.findIndex(p => p.id_slug === slug);
+  let current: Lugar;
 
-  const current = currentList[index];
+  if (index === -1) {
+    // Si el negocio viene de ubicame.cc y aún no está en el JSON local, traerlo y guardarlo
+    const livePlace = await getLugarBySlug(slug);
+    if (!livePlace) return null;
+    current = livePlace;
+    index = currentList.length;
+    currentList.push(current);
+  } else {
+    current = currentList[index];
+  }
+
   if (updates.latitud !== undefined || updates.longitud !== undefined || updates.zona || updates.ciudad || updates.provincia) {
     const coords = getCoordinatesForPlace(
       updates.zona || current.zona,
@@ -383,6 +448,7 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
 
   currentList[index] = updated;
   writeLocalFile(currentList);
+  invalidateUbicameCache();
   return updated;
 }
 
@@ -499,6 +565,22 @@ function mapRowToLugar(row: any): Lugar {
   const latParsed = row.latitud != null ? parseFloat(row.latitud) : NaN;
   const lngParsed = row.longitud != null ? parseFloat(row.longitud) : NaN;
 
+  let email_propietario = row.email_propietario || undefined;
+  let nombre_propietario = row.nombre_propietario || undefined;
+
+  if (!email_propietario && row.descripcion) {
+    const match = row.descripcion.match(/Cuenta Google:\s*([^<]*)<([^>]+)>/i);
+    if (match) {
+      nombre_propietario = match[1]?.trim() || undefined;
+      email_propietario = match[2]?.trim().toLowerCase() || undefined;
+    } else {
+      const emailOnly = row.descripcion.match(/<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>/);
+      if (emailOnly) {
+        email_propietario = emailOnly[1].toLowerCase();
+      }
+    }
+  }
+
   return {
     id_slug: row.id_slug,
     nombre: row.nombre,
@@ -518,6 +600,8 @@ function mapRowToLugar(row: any): Lugar {
     estado: row.estado || 'activo',
     descripcion: row.descripcion || undefined,
     foto_url: row.foto_url || undefined,
+    email_propietario,
+    nombre_propietario,
   };
 }
 
@@ -578,3 +662,37 @@ async function getLugaresFromPostgres(filters?: PlaceFilters): Promise<Lugar[]> 
   const res = await pool.query(query, values);
   return res.rows.map(mapRowToLugar);
 }
+
+/**
+ * Obtener todos los lugares pertenecientes a un propietario (verificados por email de Google)
+ * Incluye tanto lugares activos como pendientes de aprobación.
+ */
+export async function getLugaresByOwnerEmail(email: string): Promise<Lugar[]> {
+  if (!email) return [];
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (shouldUsePostgres) {
+    try {
+      const pool = await getPgPool();
+      const simpleQuery = `
+        SELECT id_slug, nombre, tipo, icono, provincia, ciudad, zona,
+               latitud, longitud, es_referencia, es_servicio, prioridad,
+               origen, whatsapp, url_perfil, estado, descripcion, foto_url
+        FROM lugares
+        WHERE LOWER(descripcion) LIKE $1;
+      `;
+      const res = await pool.query(simpleQuery, [`%${cleanEmail}%`]);
+      return res.rows.map(mapRowToLugar);
+    } catch (err) {
+      console.warn('Error al buscar lugares por dueño en Postgres:', err);
+    }
+  }
+
+  const local = readLocalFile();
+  return local.filter(p => {
+    const owner = p.email_propietario?.toLowerCase() || '';
+    const desc = p.descripcion?.toLowerCase() || '';
+    return owner === cleanEmail || desc.includes(cleanEmail);
+  });
+}
+

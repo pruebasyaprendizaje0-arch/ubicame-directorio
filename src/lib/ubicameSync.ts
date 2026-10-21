@@ -362,8 +362,36 @@ function persistLugaresToJsonAsync(newUbicameLugares: Lugar[]) {
     for (const u of newUbicameLugares) {
       const idx = currentLugares.findIndex(l => l.id_slug === u.id_slug);
       if (idx >= 0) {
-        currentLugares[idx] = { ...currentLugares[idx], ...u };
-        hasChanges = true;
+        const existing = currentLugares[idx];
+        // Preservar estrictamente las coordenadas existentes (especialmente reubicaciones satelitales)
+        const hasExistingValidCoords =
+          existing.latitud !== undefined &&
+          !isNaN(existing.latitud) &&
+          existing.longitud !== undefined &&
+          !isNaN(existing.longitud);
+
+        const merged: Lugar = {
+          ...u,
+          ...existing,
+          latitud: hasExistingValidCoords ? existing.latitud : u.latitud,
+          longitud: hasExistingValidCoords ? existing.longitud : u.longitud,
+          exactitud_gps: existing.exactitud_gps || u.exactitud_gps,
+          foto_url: existing.foto_url || u.foto_url,
+          descripcion: existing.descripcion || u.descripcion,
+          email_propietario: existing.email_propietario || u.email_propietario,
+          nombre_propietario: existing.nombre_propietario || u.nombre_propietario,
+        };
+
+        // Solo marcar cambio si realmente hay datos nuevos para no causar bucles de Fast Refresh
+        if (
+          existing.latitud !== merged.latitud ||
+          existing.longitud !== merged.longitud ||
+          existing.whatsapp !== merged.whatsapp ||
+          existing.url_perfil !== merged.url_perfil
+        ) {
+          currentLugares[idx] = merged;
+          hasChanges = true;
+        }
       } else {
         currentLugares.unshift(u);
         hasChanges = true;
@@ -408,7 +436,20 @@ export async function syncUbicameCcWithDirectory(): Promise<{
     for (const b of businesses) {
       const idx = currentLugares.findIndex(l => l.id_slug === b.id_slug);
       if (idx >= 0) {
-        currentLugares[idx] = { ...currentLugares[idx], ...b };
+        const existing = currentLugares[idx];
+        const hasExistingValidCoords =
+          existing.latitud !== undefined &&
+          !isNaN(existing.latitud) &&
+          existing.longitud !== undefined &&
+          !isNaN(existing.longitud);
+
+        currentLugares[idx] = {
+          ...b,
+          ...existing,
+          latitud: hasExistingValidCoords ? existing.latitud : b.latitud,
+          longitud: hasExistingValidCoords ? existing.longitud : b.longitud,
+          exactitud_gps: existing.exactitud_gps || b.exactitud_gps,
+        };
       } else {
         currentLugares.unshift(b);
       }

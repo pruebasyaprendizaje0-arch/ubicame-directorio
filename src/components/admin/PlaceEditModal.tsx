@@ -13,6 +13,7 @@ import {
   ExternalLink,
   ShieldAlert,
 } from 'lucide-react';
+import { LocationPickerMap } from '@/components/LocationPickerMap';
 
 interface PlaceEditModalProps {
   place: Lugar | null;
@@ -298,32 +299,62 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
             </div>
           </div>
 
-          {/* Coordenadas GPS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Latitud GPS
+          {/* Mini-Mapa Satelital de Precisión (Super Admin) */}
+          <div className="space-y-2 pt-2 border-t border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <span className="text-cyan-400">🛰️</span>
+                <span>Reubicar Pin Satelital (Alta Precisión Techos)</span>
               </label>
-              <input
-                type="number"
-                step="any"
-                value={formData.latitud ?? -1.82}
-                onChange={e => setFormData({ ...formData, latitud: parseFloat(e.target.value) || 0 })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-              />
+              <span className="text-[11px] text-cyan-400/90 font-mono bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
+                {(formData.latitud ?? -1.82).toFixed(6)}, {(formData.longitud ?? -80.75).toFixed(6)}
+              </span>
             </div>
+            <p className="text-[11px] text-slate-400">
+              Usa la capa satelital aérea para ver las construcciones y arrastra el pin directamente al techo de la propiedad.
+            </p>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Longitud GPS
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={formData.longitud ?? -80.75}
-                onChange={e => setFormData({ ...formData, longitud: parseFloat(e.target.value) || 0 })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-              />
+            <LocationPickerMap
+              lat={formData.latitud ?? -1.82}
+              lng={formData.longitud ?? -80.75}
+              height="280px"
+              zoom={18}
+              onChange={(coords) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  latitud: coords.lat,
+                  longitud: coords.lng,
+                }));
+              }}
+            />
+
+            {/* Campos manuales de GPS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Latitud Numérica
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={formData.latitud ?? -1.82}
+                  onChange={e => setFormData({ ...formData, latitud: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Longitud Numérica
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  value={formData.longitud ?? -80.75}
+                  onChange={e => setFormData({ ...formData, longitud: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
+                />
+              </div>
             </div>
           </div>
 

@@ -938,3 +938,76 @@ export function inferProvinceAndCanton(query?: string | null): { provincia?: str
   return null;
 }
 
+export interface NearestTownResult {
+  pueblo: string;
+  canton: string;
+  provincia: string;
+  distanciaKm: number;
+}
+
+export const BASE_TOWNS_FOR_DETECTION: Array<{
+  nombre: string;
+  canton: string;
+  provincia: string;
+  lat: number;
+  lng: number;
+}> = [
+  // Ruta del Spondylus / Costa Norte Santa Elena
+  { nombre: 'Olón', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.804, lng: -80.73 },
+  { nombre: 'Montañita', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.828, lng: -80.75 },
+  { nombre: 'Manglaralto', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.006, lng: -80.73 },
+  { nombre: 'Curía', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.77, lng: -80.74 },
+  { nombre: 'San José', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.74, lng: -80.75 },
+  { nombre: 'Las Núñez', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.705, lng: -80.765 },
+  { nombre: 'La Entrada', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.68, lng: -80.77 },
+  { nombre: 'Cadeate', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.91, lng: -80.72 },
+  { nombre: 'San Antonio', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.90, lng: -80.72 },
+  { nombre: 'Libertador Bolívar', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.93, lng: -80.71 },
+  { nombre: 'Valdivia', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.95, lng: -80.715 },
+  { nombre: 'San Pedro', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.97, lng: -80.718 },
+  { nombre: 'Ayangue', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.985, lng: -80.748 },
+  { nombre: 'Palmar', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.02, lng: -80.73 },
+  { nombre: 'Colonche', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.00, lng: -80.68 },
+  // Península Urbana
+  { nombre: 'Ballenita', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.205, lng: -80.875 },
+  { nombre: 'Santa Elena', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.22, lng: -80.85 },
+  { nombre: 'La Libertad', canton: 'La Libertad', provincia: 'Santa Elena', lat: -2.233, lng: -80.91 },
+  { nombre: 'Salinas', canton: 'Salinas', provincia: 'Santa Elena', lat: -2.218, lng: -80.957 },
+  { nombre: 'Chipipe', canton: 'Salinas', provincia: 'Santa Elena', lat: -2.212, lng: -80.963 },
+  { nombre: 'Ancón', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.325, lng: -80.865 },
+  { nombre: 'Chanduy', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.40, lng: -80.68 },
+  // Manabí Sur & Manta
+  { nombre: 'Puerto López', canton: 'Puerto López', provincia: 'Manabí', lat: -1.556, lng: -80.812 },
+  { nombre: 'Salango', canton: 'Puerto López', provincia: 'Manabí', lat: -1.59, lng: -80.84 },
+  { nombre: 'Manta', canton: 'Manta', provincia: 'Manabí', lat: -0.9676, lng: -80.7089 },
+  // Principales urbes
+  { nombre: 'Guayaquil', canton: 'Guayaquil', provincia: 'Guayas', lat: -2.17, lng: -79.92 },
+  { nombre: 'Samborondón', canton: 'Samborondón', provincia: 'Guayas', lat: -2.091, lng: -79.724 },
+  { nombre: 'Quito', canton: 'Quito', provincia: 'Pichincha', lat: -0.18, lng: -78.46 },
+  { nombre: 'Cuenca', canton: 'Cuenca', provincia: 'Azuay', lat: -2.9001, lng: -79.0059 },
+];
+
+/**
+ * Autodetecta la comuna, pueblo o ciudad más cercana en Ecuador dadas coordenadas lat/lng
+ */
+export function findNearestTownOrComuna(lat: number, lng: number): NearestTownResult {
+  let best = BASE_TOWNS_FOR_DETECTION[0];
+  let minDistance = calculateDistanceKm(lat, lng, best.lat, best.lng);
+
+  for (let i = 1; i < BASE_TOWNS_FOR_DETECTION.length; i++) {
+    const item = BASE_TOWNS_FOR_DETECTION[i];
+    const dist = calculateDistanceKm(lat, lng, item.lat, item.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      best = item;
+    }
+  }
+
+  return {
+    pueblo: best.nombre,
+    canton: best.canton,
+    provincia: best.provincia,
+    distanciaKm: Number(minDistance.toFixed(2)),
+  };
+}
+

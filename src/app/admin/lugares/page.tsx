@@ -19,6 +19,9 @@ import {
   Wrench,
   RefreshCw,
   SlidersHorizontal,
+  Check,
+  Clock,
+  Loader2,
 } from 'lucide-react';
 
 export default function AdminPlacesPage() {
@@ -28,14 +31,15 @@ export default function AdminPlacesPage() {
   // Filters
   const [search, setSearch] = useState('');
   const [selectedZona, setSelectedZona] = useState<string>('all');
-  const [selectedFilterType, setSelectedFilterType] = useState<'all' | 'p1' | 'references' | 'services'>('all');
+  const [selectedFilterType, setSelectedFilterType] = useState<'all' | 'pending' | 'p1' | 'references' | 'services'>('all');
 
-  // Modal State
+  // Modal & Action State
   const [editPlace, setEditPlace] = useState<Lugar | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewPlace, setIsNewPlace] = useState(false);
   const [syncingUbicame, setSyncingUbicame] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [actionLoadingSlug, setActionLoadingSlug] = useState<string | null>(null);
 
   // Sync with ubicame.cc
   const handleSyncUbicame = async () => {
@@ -104,6 +108,9 @@ export default function AdminPlacesPage() {
       }
 
       // Quick filter tabs
+      if (selectedFilterType === 'pending') {
+        return p.estado === 'pendiente';
+      }
       if (selectedFilterType === 'p1') {
         return p.prioridad === 1 || p.origen === 'ubicame_cc';
       }
@@ -132,6 +139,53 @@ export default function AdminPlacesPage() {
     setIsModalOpen(true);
   };
 
+  // Quick 1-click Approve
+  const handleApprove = async (place: Lugar) => {
+    setActionLoadingSlug(place.id_slug);
+    try {
+      const res = await fetch(`/api/admin/places/${place.id_slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'activo' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPlaces(prev => prev.map(p => p.id_slug === place.id_slug ? { ...p, estado: 'activo' } : p));
+        setSyncMessage(`¡Negocio "${place.nombre}" aprobado y visible públicamente en el mapa!`);
+      } else {
+        alert(data.error || 'No se pudo aprobar el lugar');
+      }
+    } catch (err: any) {
+      alert('Error de conexión al aprobar lugar: ' + err.message);
+    } finally {
+      setActionLoadingSlug(null);
+    }
+  };
+
+  // Quick Reject
+  const handleReject = async (place: Lugar) => {
+    if (!confirm(`¿Estás seguro de que deseas rechazar y eliminar la solicitud de "${place.nombre}"?`)) {
+      return;
+    }
+    setActionLoadingSlug(place.id_slug);
+    try {
+      const res = await fetch(`/api/admin/places/${place.id_slug}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPlaces(prev => prev.filter(p => p.id_slug !== place.id_slug));
+        setSyncMessage(`Solicitud de "${place.nombre}" rechazada y eliminada.`);
+      } else {
+        alert(data.error || 'No se pudo rechazar el lugar');
+      }
+    } catch (err: any) {
+      alert('Error de conexión al rechazar lugar: ' + err.message);
+    } finally {
+      setActionLoadingSlug(null);
+    }
+  };
+
   // Callbacks after save/delete
   const handleSaved = (savedLugar: Lugar) => {
     setPlaces(prev => {
@@ -151,6 +205,7 @@ export default function AdminPlacesPage() {
 
   // Metrics
   const totalCount = places.length;
+  const pendingCount = places.filter(p => p.estado === 'pendiente').length;
   const p1Count = places.filter(p => p.prioridad === 1 || p.origen === 'ubicame_cc').length;
   const refCount = places.filter(p => p.es_referencia).length;
   const servCount = places.filter(p => p.es_servicio).length;
@@ -213,16 +268,38 @@ export default function AdminPlacesPage() {
         )}
 
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <span className="text-xs text-slate-400 font-medium">Total Lugares</span>
             <div className="text-xl font-extrabold text-white mt-0.5">{totalCount}</div>
           </div>
 
+          <div
+            onClick={() => setSelectedFilterType('pending')}
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+              pendingCount > 0
+                ? 'bg-gradient-to-br from-amber-950/40 to-slate-900 border-amber-500/60 shadow-lg shadow-amber-500/10 hover:border-amber-400'
+                : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <span className="text-xs text-amber-300 font-medium flex items-center gap-1">
+              <Clock size={12} className={pendingCount > 0 ? 'text-amber-400 animate-pulse' : ''} />
+              <span>Por Revisar</span>
+            </span>
+            <div className="text-xl font-extrabold text-amber-400 mt-0.5 flex items-center gap-2">
+              <span>{pendingCount}</span>
+              {pendingCount > 0 && (
+                <span className="text-[10px] bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full font-black uppercase">
+                  Pendientes
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-amber-500/30 bg-gradient-to-br from-slate-900/80 to-amber-950/20">
             <span className="text-xs text-amber-300 font-medium flex items-center gap-1">
               <Sparkles size={12} />
-              <span>Clientes P1 ubicame.cc</span>
+              <span>Clientes P1</span>
             </span>
             <div className="text-xl font-extrabold text-amber-400 mt-0.5">{p1Count}</div>
           </div>
@@ -230,7 +307,7 @@ export default function AdminPlacesPage() {
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-purple-500/30">
             <span className="text-xs text-purple-300 font-medium flex items-center gap-1">
               <Landmark size={12} />
-              <span>Puntos de Referencia</span>
+              <span>Referencias</span>
             </span>
             <div className="text-xl font-extrabold text-purple-400 mt-0.5">{refCount}</div>
           </div>
@@ -238,7 +315,7 @@ export default function AdminPlacesPage() {
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-emerald-500/30">
             <span className="text-xs text-emerald-300 font-medium flex items-center gap-1">
               <Wrench size={12} />
-              <span>Servicios de Urgencia</span>
+              <span>Servicios</span>
             </span>
             <div className="text-xl font-extrabold text-emerald-400 mt-0.5">{servCount}</div>
           </div>
@@ -293,6 +370,23 @@ export default function AdminPlacesPage() {
               }`}
             >
               Todos ({totalCount})
+            </button>
+
+            <button
+              onClick={() => setSelectedFilterType('pending')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                selectedFilterType === 'pending'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : pendingCount > 0
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                  : 'bg-slate-800/80 text-slate-400 hover:text-white'
+              }`}
+            >
+              <Clock size={12} className={pendingCount > 0 ? 'text-amber-400' : ''} />
+              <span>Pendientes ({pendingCount})</span>
+              {pendingCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              )}
             </button>
 
             <button
@@ -359,13 +453,17 @@ export default function AdminPlacesPage() {
                     <tr
                       key={place.id_slug}
                       className={`hover:bg-slate-800/50 transition-colors ${
-                        isP1 ? 'bg-amber-950/10' : ''
+                        place.estado === 'pendiente'
+                          ? 'bg-amber-950/20 border-l-4 border-amber-500'
+                          : isP1
+                          ? 'bg-amber-950/10'
+                          : ''
                       }`}
                     >
                       {/* Place & Icon */}
                       <td className="py-3 px-3.5 font-sans">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/80 flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700/80 flex items-center justify-center flex-shrink-0 relative">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={iconSrc}
@@ -373,11 +471,19 @@ export default function AdminPlacesPage() {
                               className="w-4 h-4 invert object-contain"
                               onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg'; }}
                             />
+                            {place.foto_url && (
+                              <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full bg-cyan-400 border border-slate-900" title="Tiene foto" />
+                            )}
                           </div>
 
                           <div>
                             <div className="font-bold text-white text-sm leading-tight flex items-center gap-2">
                               <span>{place.nombre}</span>
+                              {place.estado === 'pendiente' && (
+                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 shadow-sm animate-pulse">
+                                  ⏳ Pendiente
+                                </span>
+                              )}
                               {place.es_referencia && (
                                 <span className="inline-flex px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                                   Ref
@@ -389,9 +495,20 @@ export default function AdminPlacesPage() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-[11px] text-slate-400 font-mono">
-                              {place.id_slug}
-                            </span>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono mt-0.5">
+                              <span>{place.id_slug}</span>
+                              {place.foto_url && (
+                                <a
+                                  href={place.foto_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-cyan-400 hover:underline flex items-center gap-0.5 font-sans text-[10.5px]"
+                                >
+                                  <span>[Ver Foto]</span>
+                                  <ExternalLink size={10} />
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -408,7 +525,12 @@ export default function AdminPlacesPage() {
 
                       {/* Prioridad */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        {isP1 ? (
+                        {place.estado === 'pendiente' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10.5px] font-bold">
+                            <Clock size={10} />
+                            <span>Por Aprobar</span>
+                          </span>
+                        ) : isP1 ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10.5px] font-bold">
                             <Sparkles size={10} />
                             <span>P1 ubicame.cc</span>
@@ -459,9 +581,37 @@ export default function AdminPlacesPage() {
 
                       {/* Action Buttons */}
                       <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                        {place.estado === 'pendiente' && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(place)}
+                              disabled={actionLoadingSlug === place.id_slug}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black bg-emerald-600 text-white hover:bg-emerald-500 transition-all cursor-pointer mr-1.5 shadow-sm shadow-emerald-600/30"
+                              title="Aprobar y publicar en el mapa"
+                            >
+                              {actionLoadingSlug === place.id_slug ? (
+                                <Loader2 size={12} className="animate-spin text-white" />
+                              ) : (
+                                <Check size={12} className="stroke-[3]" />
+                              )}
+                              <span>Aprobar</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleReject(place)}
+                              disabled={actionLoadingSlug === place.id_slug}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-rose-950/60 text-rose-300 border border-rose-500/30 hover:bg-rose-900 transition-all cursor-pointer mr-1.5"
+                              title="Rechazar y eliminar solicitud"
+                            >
+                              <Trash2 size={12} />
+                              <span>Rechazar</span>
+                            </button>
+                          </>
+                        )}
+
                         <button
                           onClick={() => handleEdit(place)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500 hover:text-slate-950 transition-all cursor-pointer mr-1.5"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500 hover:text-slate-950 transition-all cursor-pointer"
                           title="Editar negocio o punto"
                         >
                           <Edit2 size={12} />

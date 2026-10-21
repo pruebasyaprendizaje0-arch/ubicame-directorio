@@ -27,12 +27,14 @@ interface PlaceDetailModalProps {
   place: Lugar | null;
   onClose: () => void;
   onViewOnMap?: (place: Lugar) => void;
+  onRelocate?: (place: Lugar) => void;
 }
 
 export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   place,
   onClose,
   onViewOnMap,
+  onRelocate,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -80,15 +82,18 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#040711]/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 bg-[#040711]/85 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto animate-fade-in"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-lg bg-[#0d1322] border border-slate-800 rounded-2xl p-5 sm:p-7 shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700"
+        className="w-full sm:max-w-lg bg-[#0d1322] border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl p-5 sm:p-7 shadow-2xl relative max-h-[85vh] sm:max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 animate-slide-up sm:animate-none"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Thumb Pull Down Bar on Mobile */}
+        <div className="w-12 h-1 rounded-full bg-slate-600/70 mx-auto mb-3 sm:hidden" />
+
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -253,6 +258,31 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             {copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
             <span>{copied ? 'Copiado' : 'Compartir'}</span>
           </button>
+        </div>
+
+        {/* Sección Reubicar Icono (Opción 2) */}
+        <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1 text-slate-400 text-[11px]">
+            <span>¿Ubicación inexacta en el mapa?</span>
+          </div>
+          {onRelocate ? (
+            <button
+              onClick={() => {
+                onRelocate(place);
+                onClose();
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/90 border border-cyan-500/30 transition-all cursor-pointer active:scale-95"
+            >
+              <span>🛰️ Soy el dueño: Reubicar</span>
+            </button>
+          ) : (
+            <a
+              href={`/mi-negocio?slug=${place.id_slug}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/90 border border-cyan-500/30 transition-all active:scale-95"
+            >
+              <span>🛰️ Soy el dueño: Reubicar</span>
+            </a>
+          )}
         </div>
       </div>
     </div>

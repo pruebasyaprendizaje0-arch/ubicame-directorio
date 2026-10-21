@@ -12,6 +12,7 @@ import {
   Plus,
   LogOut,
   UserCheck,
+  Clock,
 } from 'lucide-react';
 
 interface AdminHeaderProps {
@@ -24,6 +25,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onNewPlace }) => {
 
   const isPlacesActive = pathname === '/admin/lugares' || pathname === '/admin';
   const isImportActive = pathname === '/admin/importar';
+  const isPendingActive = pathname === '/admin/pendientes';
 
   const handleLogout = async () => {
     try {
@@ -70,6 +72,18 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onNewPlace }) => {
           >
             <Building2 size={14} />
             <span>Gestión de Lugares</span>
+          </Link>
+
+          <Link
+            href="/admin/pendientes"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              isPendingActive
+                ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+            }`}
+          >
+            <Clock size={14} />
+            <span>Pendientes</span>
           </Link>
 
           <Link
