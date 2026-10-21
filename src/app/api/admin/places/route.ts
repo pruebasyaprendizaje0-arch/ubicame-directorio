@@ -57,6 +57,8 @@ export async function POST(request: NextRequest) {
       icono: body.icono || 'lugar.svg',
       provincia: body.provincia || 'Santa Elena',
       ciudad: body.ciudad || 'Santa Elena',
+      parroquia: body.parroquia || undefined,
+      comuna: body.comuna || body.zona.trim(),
       zona: body.zona.trim(),
       latitud: coords.lat,
       longitud: coords.lng,

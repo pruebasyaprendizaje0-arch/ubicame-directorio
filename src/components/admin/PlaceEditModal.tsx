@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Lugar } from '@/types/lugar';
 import {
   X,
@@ -12,8 +12,19 @@ import {
   Sparkles,
   ExternalLink,
   ShieldAlert,
+  Landmark,
+  Building,
+  Home,
+  Layers,
 } from 'lucide-react';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
+import {
+  PROVINCIAS_ECUADOR,
+  getCantonesPorProvincia,
+  getParroquiasPorCanton,
+  getComunasPorFiltros,
+  inferHierarchy,
+} from '@/lib/geo';
 
 interface PlaceEditModalProps {
   place: Lugar | null;
@@ -54,8 +65,19 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
 
   useEffect(() => {
     if (place) {
+      const inferred = inferHierarchy(place.zona || place.nombre || '');
+      const prov = place.provincia || inferred.provincia || 'Santa Elena';
+      const cant = place.ciudad || inferred.canton || (prov === 'Santa Elena' ? 'Santa Elena' : '');
+      const parr = place.parroquia || inferred.parroquia || (prov === 'Santa Elena' && cant === 'Santa Elena' ? 'Manglaralto' : '');
+      const zon = place.zona || place.comuna || inferred.comuna || 'Olón';
+
       setFormData({
         ...place,
+        provincia: prov,
+        ciudad: cant,
+        parroquia: parr,
+        zona: zon,
+        comuna: zon,
       });
     } else if (isNew) {
       setFormData({
@@ -65,7 +87,9 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
         icono: 'restaurante.svg',
         provincia: 'Santa Elena',
         ciudad: 'Santa Elena',
+        parroquia: 'Manglaralto',
         zona: 'Olón',
+        comuna: 'Olón',
         latitud: -1.8021,
         longitud: -80.7605,
         es_referencia: false,
@@ -81,6 +105,77 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
     setError(null);
     setSuccessMsg(false);
   }, [place, isNew, isOpen]);
+
+  // Territorial Cascade Options
+  const currentProv = formData.provincia || 'Santa Elena';
+  const currentCanton = formData.ciudad || 'Santa Elena';
+  const currentParroquia = formData.parroquia || 'Manglaralto';
+  const currentZona = formData.zona || formData.comuna || 'Olón';
+
+  const availableCantones = useMemo(() => {
+    return getCantonesPorProvincia(currentProv);
+  }, [currentProv]);
+
+  const availableParroquias = useMemo(() => {
+    return getParroquiasPorCanton(currentProv, currentCanton);
+  }, [currentProv, currentCanton]);
+
+  const availableComunas = useMemo(() => {
+    return getComunasPorFiltros(currentProv, currentCanton, currentParroquia);
+  }, [currentProv, currentCanton, currentParroquia]);
+
+  const handleProvinciaChange = (newProv: string) => {
+    const cantones = getCantonesPorProvincia(newProv);
+    const nextCanton = cantones[0] || '';
+    const parroquias = getParroquiasPorCanton(newProv, nextCanton);
+    const nextParr = parroquias[0] || '';
+    const comunas = getComunasPorFiltros(newProv, nextCanton, nextParr);
+    const nextComuna = comunas[0] || nextParr || nextCanton;
+
+    setFormData(prev => ({
+      ...prev,
+      provincia: newProv,
+      ciudad: nextCanton,
+      parroquia: nextParr,
+      zona: nextComuna,
+      comuna: nextComuna,
+    }));
+  };
+
+  const handleCantonChange = (newCanton: string) => {
+    const parroquias = getParroquiasPorCanton(currentProv, newCanton);
+    const nextParr = parroquias[0] || '';
+    const comunas = getComunasPorFiltros(currentProv, newCanton, nextParr);
+    const nextComuna = comunas[0] || nextParr || newCanton;
+
+    setFormData(prev => ({
+      ...prev,
+      ciudad: newCanton,
+      parroquia: nextParr,
+      zona: nextComuna,
+      comuna: nextComuna,
+    }));
+  };
+
+  const handleParroquiaChange = (newParr: string) => {
+    const comunas = getComunasPorFiltros(currentProv, currentCanton, newParr);
+    const nextComuna = comunas[0] || newParr;
+
+    setFormData(prev => ({
+      ...prev,
+      parroquia: newParr,
+      zona: nextComuna,
+      comuna: nextComuna,
+    }));
+  };
+
+  const handleComunaChange = (newComuna: string) => {
+    setFormData(prev => ({
+      ...prev,
+      zona: newComuna,
+      comuna: newComuna,
+    }));
+  };
 
   if (!isOpen) return null;
 
@@ -252,50 +347,89 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
             </div>
           </div>
 
-          {/* Zona / Comuna & Ciudad */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Comuna / Zona *
-              </label>
-              <select
-                value={formData.zona || 'Olón'}
-                onChange={e => setFormData({ ...formData, zona: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-              >
-                <option value="Cadeate">Cadeate</option>
-                <option value="Manglaralto">Manglaralto</option>
-                <option value="Montañita">Montañita</option>
-                <option value="Olón">Olón</option>
-                <option value="Curía">Curía</option>
-                <option value="San Antonio">San Antonio</option>
-                <option value="Salinas">Salinas</option>
-                <option value="General">General</option>
-              </select>
+          {/* División Territorial de Ecuador (4 Niveles en Cascada) */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-800/80">
+              <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers size={13} />
+                <span>División Territorial de Ecuador (4 Niveles)</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {currentProv} &gt; {currentCanton} &gt; {currentParroquia}
+              </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Ciudad
-              </label>
-              <input
-                type="text"
-                value={formData.ciudad || 'Santa Elena'}
-                onChange={e => setFormData({ ...formData, ciudad: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 1. Provincia */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <Landmark size={12} className="text-indigo-400" />
+                  <span>1. Provincia *</span>
+                </label>
+                <select
+                  value={currentProv}
+                  onChange={e => handleProvinciaChange(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
+                >
+                  {PROVINCIAS_ECUADOR.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Provincia
-              </label>
-              <input
-                type="text"
-                value={formData.provincia || 'Santa Elena'}
-                onChange={e => setFormData({ ...formData, provincia: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
-              />
+              {/* 2. Cantón */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <Building size={12} className="text-cyan-400" />
+                  <span>2. Cantón *</span>
+                </label>
+                <select
+                  value={currentCanton}
+                  onChange={e => handleCantonChange(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
+                >
+                  {availableCantones.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Parroquia */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                  <MapPin size={12} className="text-purple-400" />
+                  <span>3. Parroquia *</span>
+                </label>
+                <select
+                  value={currentParroquia}
+                  onChange={e => handleParroquiaChange(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
+                >
+                  {availableParroquias.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Comuna / Localidad */}
+              <div>
+                <label className="block text-[11px] font-bold text-cyan-300 mb-1 flex items-center gap-1">
+                  <Home size={12} className="text-emerald-400" />
+                  <span>4. Comuna / Localidad *</span>
+                </label>
+                <select
+                  value={currentZona}
+                  onChange={e => handleComunaChange(e.target.value)}
+                  className="w-full bg-slate-950 border border-cyan-500/60 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 font-bold shadow-inner"
+                >
+                  {!availableComunas.includes(currentZona) && currentZona && (
+                    <option value={currentZona}>{currentZona} (Actual)</option>
+                  )}
+                  {availableComunas.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

@@ -373,7 +373,7 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
       let idx = 1;
 
       const allowedFields = [
-        'nombre', 'tipo', 'icono', 'provincia', 'ciudad', 'zona',
+        'nombre', 'tipo', 'icono', 'provincia', 'ciudad', 'zona', 'parroquia', 'comuna',
         'latitud', 'longitud', 'es_referencia', 'es_servicio', 'prioridad',
         'origen', 'whatsapp', 'url_perfil', 'estado', 'descripcion', 'foto_url'
       ];
@@ -588,6 +588,8 @@ function mapRowToLugar(row: any): Lugar {
     icono: row.icono || 'lugar.svg',
     provincia: row.provincia || 'Santa Elena',
     ciudad: row.ciudad || 'Santa Elena',
+    parroquia: row.parroquia || undefined,
+    comuna: row.comuna || row.zona || undefined,
     zona: row.zona || 'Olón',
     latitud: !isNaN(latParsed) ? latParsed : -1.82,
     longitud: !isNaN(lngParsed) ? lngParsed : -80.75,

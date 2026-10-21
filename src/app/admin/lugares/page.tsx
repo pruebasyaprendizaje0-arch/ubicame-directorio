@@ -16,13 +16,25 @@ import {
   Sparkles,
   ShieldCheck,
   Landmark,
+  Building,
+  Home,
+  Layers,
   Wrench,
   RefreshCw,
   SlidersHorizontal,
   Check,
   Clock,
   Loader2,
+  ChevronDown,
+  X,
 } from 'lucide-react';
+import {
+  PROVINCIAS_ECUADOR,
+  getCantonesPorProvincia,
+  getParroquiasPorCanton,
+  getComunasPorFiltros,
+  inferHierarchy,
+} from '@/lib/geo';
 
 export default function AdminPlacesPage() {
   const [places, setPlaces] = useState<Lugar[]>([]);
@@ -30,7 +42,10 @@ export default function AdminPlacesPage() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [selectedZona, setSelectedZona] = useState<string>('all');
+  const [selectedProvincia, setSelectedProvincia] = useState<string>('');
+  const [selectedCanton, setSelectedCanton] = useState<string>('');
+  const [selectedParroquia, setSelectedParroquia] = useState<string>('');
+  const [selectedComuna, setSelectedComuna] = useState<string>('');
   const [selectedFilterType, setSelectedFilterType] = useState<'all' | 'pending' | 'p1' | 'references' | 'services'>('all');
 
   // Modal & Action State
@@ -81,11 +96,33 @@ export default function AdminPlacesPage() {
     loadPlaces();
   }, []);
 
-  // Zones unique list
-  const zonas = useMemo(() => {
-    const set = new Set(places.map(p => p.zona).filter(Boolean));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
-  }, [places]);
+  // 4-level territorial cascading lists
+  const availableCantones = useMemo(() => {
+    return getCantonesPorProvincia(selectedProvincia || undefined);
+  }, [selectedProvincia]);
+
+  const availableParroquias = useMemo(() => {
+    return getParroquiasPorCanton(selectedProvincia || undefined, selectedCanton || undefined);
+  }, [selectedProvincia, selectedCanton]);
+
+  const availableComunas = useMemo(() => {
+    return getComunasPorFiltros(
+      selectedProvincia || undefined,
+      selectedCanton || undefined,
+      selectedParroquia || undefined
+    );
+  }, [selectedProvincia, selectedCanton, selectedParroquia]);
+
+  const hasTerritorialFilter = Boolean(
+    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna
+  );
+
+  const clearTerritorialFilters = () => {
+    setSelectedProvincia('');
+    setSelectedCanton('');
+    setSelectedParroquia('');
+    setSelectedComuna('');
+  };
 
   // Filtered places
   const filteredPlaces = useMemo(() => {
@@ -97,14 +134,40 @@ export default function AdminPlacesPage() {
           p.nombre.toLowerCase().includes(q) ||
           p.id_slug.toLowerCase().includes(q) ||
           p.tipo.toLowerCase().includes(q) ||
-          p.zona.toLowerCase().includes(q) ||
+          (p.zona && p.zona.toLowerCase().includes(q)) ||
+          (p.comuna && p.comuna.toLowerCase().includes(q)) ||
+          (p.parroquia && p.parroquia.toLowerCase().includes(q)) ||
+          (p.ciudad && p.ciudad.toLowerCase().includes(q)) ||
+          (p.provincia && p.provincia.toLowerCase().includes(q)) ||
           (p.descripcion && p.descripcion.toLowerCase().includes(q));
         if (!matches) return false;
       }
 
-      // Zona filter
-      if (selectedZona !== 'all' && p.zona !== selectedZona) {
-        return false;
+      // 4-level Territorial filtering
+      if (selectedProvincia && p.provincia) {
+        if (p.provincia.toLowerCase() !== selectedProvincia.toLowerCase()) return false;
+      }
+
+      if (selectedCanton && p.ciudad) {
+        if (p.ciudad.toLowerCase() !== selectedCanton.toLowerCase()) return false;
+      }
+
+      if (selectedParroquia) {
+        const placeParroquia = p.parroquia || inferHierarchy(p.zona || p.nombre || '').parroquia;
+        if (placeParroquia) {
+          if (placeParroquia.toLowerCase() !== selectedParroquia.toLowerCase()) return false;
+        } else {
+          if (p.zona?.toLowerCase() !== selectedParroquia.toLowerCase()) return false;
+        }
+      }
+
+      if (selectedComuna) {
+        const cLower = selectedComuna.toLowerCase();
+        const matchesComuna =
+          (p.zona && p.zona.toLowerCase() === cLower) ||
+          (p.comuna && p.comuna.toLowerCase() === cLower) ||
+          (p.nombre && p.nombre.toLowerCase().includes(cLower));
+        if (!matchesComuna) return false;
       }
 
       // Quick filter tabs
@@ -123,7 +186,7 @@ export default function AdminPlacesPage() {
 
       return true;
     });
-  }, [places, search, selectedZona, selectedFilterType]);
+  }, [places, search, selectedProvincia, selectedCanton, selectedParroquia, selectedComuna, selectedFilterType]);
 
   // Open edit modal
   const handleEdit = (place: Lugar) => {
@@ -336,26 +399,109 @@ export default function AdminPlacesPage() {
               />
             </div>
 
-            {/* Zona Dropdown */}
+            {/* Refresh Button */}
             <div className="flex items-center gap-2">
-              <select
-                value={selectedZona}
-                onChange={e => setSelectedZona(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-medium focus:outline-none focus:border-cyan-500"
-              >
-                <option value="all">Todas las Comunas/Zonas</option>
-                {zonas.map(z => (
-                  <option key={z} value={z}>{z}</option>
-                ))}
-              </select>
-
               <button
                 onClick={loadPlaces}
-                className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition-colors"
+                className="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer"
                 title="Refrescar lista"
               >
-                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">Refrescar</span>
               </button>
+            </div>
+          </div>
+
+          {/* 4-Level Territorial Cascading Selectors */}
+          <div className="pt-2.5 border-t border-slate-800/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers size={13} />
+                <span>Filtrar por Territorio (4 Niveles)</span>
+              </span>
+              {hasTerritorialFilter && (
+                <button
+                  onClick={clearTerritorialFilters}
+                  className="text-[11px] text-rose-400 hover:text-rose-300 font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <X size={12} />
+                  <span>Limpiar filtro territorial</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* 1. Provincia */}
+              <div className="relative">
+                <select
+                  value={selectedProvincia}
+                  onChange={e => {
+                    setSelectedProvincia(e.target.value);
+                    setSelectedCanton('');
+                    setSelectedParroquia('');
+                    setSelectedComuna('');
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-2.5 pr-7 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer truncate font-medium"
+                >
+                  <option value="">Todas las Provincias ({PROVINCIAS_ECUADOR.length})</option>
+                  {PROVINCIAS_ECUADOR.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={13} />
+              </div>
+
+              {/* 2. Cantón */}
+              <div className="relative">
+                <select
+                  value={selectedCanton}
+                  onChange={e => {
+                    setSelectedCanton(e.target.value);
+                    setSelectedParroquia('');
+                    setSelectedComuna('');
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-2.5 pr-7 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer truncate font-medium"
+                >
+                  <option value="">Todos los Cantones</option>
+                  {availableCantones.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={13} />
+              </div>
+
+              {/* 3. Parroquia */}
+              <div className="relative">
+                <select
+                  value={selectedParroquia}
+                  onChange={e => {
+                    setSelectedParroquia(e.target.value);
+                    setSelectedComuna('');
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-2.5 pr-7 text-xs text-white focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer truncate font-medium"
+                >
+                  <option value="">Todas las Parroquias</option>
+                  {availableParroquias.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={13} />
+              </div>
+
+              {/* 4. Comuna / Localidad */}
+              <div className="relative">
+                <select
+                  value={selectedComuna}
+                  onChange={e => setSelectedComuna(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-2.5 pr-7 text-xs text-cyan-300 focus:outline-none focus:border-cyan-400 appearance-none cursor-pointer truncate font-bold"
+                >
+                  <option value="">Todas las Comunas</option>
+                  {availableComunas.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={13} />
+              </div>
             </div>
           </div>
 
@@ -434,7 +580,7 @@ export default function AdminPlacesPage() {
               <thead className="sticky top-0 bg-[#080d1a] border-b border-slate-800 text-slate-400 font-semibold z-10">
                 <tr>
                   <th className="py-3 px-3.5">Lugar / Negocio</th>
-                  <th className="py-3 px-3">Comuna</th>
+                  <th className="py-3 px-3">Ubicación Territorial</th>
                   <th className="py-3 px-3">Categoría</th>
                   <th className="py-3 px-3">Prioridad / Origen</th>
                   <th className="py-3 px-3">WhatsApp</th>
@@ -513,9 +659,19 @@ export default function AdminPlacesPage() {
                         </div>
                       </td>
 
-                      {/* Zona */}
-                      <td className="py-3 px-3 font-sans text-cyan-300 font-semibold whitespace-nowrap">
-                        {place.zona}
+                      {/* Ubicación Territorial: Comuna / Parroquia / Cantón */}
+                      <td className="py-3 px-3 font-sans">
+                        <div className="font-bold text-cyan-300 text-xs flex items-center gap-1">
+                          <MapPin size={12} className="text-cyan-400 flex-shrink-0" />
+                          <span>{place.zona || place.comuna || 'Sin comuna'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {place.parroquia ? (
+                            <span>Parr. {place.parroquia} • {place.ciudad || 'Santa Elena'}</span>
+                          ) : (
+                            <span>{place.ciudad || 'Santa Elena'}, {place.provincia || 'Santa Elena'}</span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Tipo */}

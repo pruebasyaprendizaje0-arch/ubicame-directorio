@@ -82,6 +82,7 @@ export const DIVISION_TERRITORIAL_ECUADOR: Record<
         'San José',
         'Las Núñez',
         'La Entrada',
+        'La Rinconada',
         'San Antonio',
         'Libertador Bolívar',
         'Valdivia',
@@ -92,6 +93,12 @@ export const DIVISION_TERRITORIAL_ECUADOR: Record<
         'Sinchal',
         'Barcelona',
         'Pajiza',
+        'Loma Alta',
+        'San Vicente',
+        'Bellavista del Cerro',
+        'Atravesado',
+        'Río Blanco',
+        'Sitio Nuevo',
       ],
       'Colonche': [
         'Colonche',
@@ -719,6 +726,15 @@ export const ECUADOR_COORDINATES_CATALOG: Record<string, { lat: number; lng: num
   'las núñez': { lat: -1.7050, lng: -80.7650 },
   'las nunez': { lat: -1.7050, lng: -80.7650 },
   'la entrada': { lat: -1.6800, lng: -80.7700 },
+  'la rinconada': { lat: -1.6640, lng: -80.7850 },
+  'loma alta': { lat: -1.9150, lng: -80.6400 },
+  'san vicente manglaralto': { lat: -1.8650, lng: -80.7100 },
+  'san vicente (santa elena)': { lat: -1.8650, lng: -80.7100 },
+  'bellavista del cerro': { lat: -1.8350, lng: -80.6900 },
+  'atravesado': { lat: -1.8800, lng: -80.6600 },
+  'río blanco': { lat: -1.8200, lng: -80.6700 },
+  'rio blanco': { lat: -1.8200, lng: -80.6700 },
+  'sitio nuevo': { lat: -1.8400, lng: -80.7000 },
   'san antonio': { lat: -1.9000, lng: -80.7200 },
   'libertador bolívar': { lat: -1.9300, lng: -80.7100 },
   'libertador bolivar': { lat: -1.9300, lng: -80.7100 },
@@ -863,13 +879,19 @@ export function getCoordinatesForPlace(
     return { lat: parsedLat, lng: parsedLng };
   }
 
-  // Buscar por orden de especificidad: comuna -> parroquia -> cantón -> provincia
-  const candidates = [
-    comuna?.toLowerCase().trim(),
-    parroquia?.toLowerCase().trim(),
-    canton?.toLowerCase().trim(),
-    provincia?.toLowerCase().trim(),
-  ].filter(Boolean) as string[];
+  // Buscar por orden de especificidad: comuna + parroquia -> comuna + provincia -> comuna -> parroquia -> cantón -> provincia
+  const c = comuna?.toLowerCase().trim();
+  const p = parroquia?.toLowerCase().trim();
+  const ct = canton?.toLowerCase().trim();
+  const pr = provincia?.toLowerCase().trim();
+
+  const candidates: string[] = [];
+  if (c && p) candidates.push(`${c} ${p}`);
+  if (c && pr) candidates.push(`${c} (${pr})`, `${c} ${pr}`);
+  if (c) candidates.push(c);
+  if (p) candidates.push(p);
+  if (ct) candidates.push(ct);
+  if (pr) candidates.push(pr);
 
   let baseCoord: { lat: number; lng: number } | null = null;
 
@@ -960,6 +982,9 @@ export const BASE_TOWNS_FOR_DETECTION: Array<{
   { nombre: 'San José', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.74, lng: -80.75 },
   { nombre: 'Las Núñez', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.705, lng: -80.765 },
   { nombre: 'La Entrada', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.68, lng: -80.77 },
+  { nombre: 'La Rinconada', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.664, lng: -80.785 },
+  { nombre: 'Dos Mangas', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.845, lng: -80.685 },
+  { nombre: 'Loma Alta', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.915, lng: -80.640 },
   { nombre: 'Cadeate', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.91, lng: -80.72 },
   { nombre: 'San Antonio', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.90, lng: -80.72 },
   { nombre: 'Libertador Bolívar', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.93, lng: -80.71 },
