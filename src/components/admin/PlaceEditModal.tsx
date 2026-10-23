@@ -24,6 +24,7 @@ import {
   getParroquiasPorCanton,
   getComunasPorFiltros,
   inferHierarchy,
+  getCoordinatesForPlace,
 } from '@/lib/geo';
 
 interface PlaceEditModalProps {
@@ -71,6 +72,23 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
       const parr = place.parroquia || inferred.parroquia || (prov === 'Santa Elena' && cant === 'Santa Elena' ? 'Manglaralto' : '');
       const zon = place.zona || place.comuna || inferred.comuna || 'Olón';
 
+      let safeLat = place.latitud;
+      let safeLng = place.longitud;
+      if (
+        safeLat === undefined ||
+        safeLng === undefined ||
+        isNaN(safeLat) ||
+        isNaN(safeLng) ||
+        safeLng < -81.5 ||
+        safeLng > -75.0 ||
+        safeLat < -5.5 ||
+        safeLat > 1.6
+      ) {
+        const defaultCoords = getCoordinatesForPlace(zon, parr, cant, prov, undefined, undefined, place.id_slug);
+        safeLat = defaultCoords.lat;
+        safeLng = defaultCoords.lng;
+      }
+
       setFormData({
         ...place,
         provincia: prov,
@@ -78,6 +96,8 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
         parroquia: parr,
         zona: zon,
         comuna: zon,
+        latitud: safeLat,
+        longitud: safeLng,
       });
     } else if (isNew) {
       setFormData({
@@ -169,12 +189,52 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
     }));
   };
 
-  const handleComunaChange = (newComuna: string) => {
+  const handleCenterOnComuna = () => {
+    const coords = getCoordinatesForPlace(
+      formData.comuna || formData.zona,
+      formData.parroquia,
+      formData.ciudad,
+      formData.provincia,
+      undefined,
+      undefined,
+      place?.id_slug
+    );
     setFormData(prev => ({
       ...prev,
-      zona: newComuna,
-      comuna: newComuna,
+      latitud: coords.lat,
+      longitud: coords.lng,
     }));
+  };
+
+  const handleComunaChange = (newComuna: string) => {
+    setFormData(prev => {
+      const isOceanOrInvalid =
+        !prev.longitud ||
+        isNaN(prev.longitud) ||
+        prev.longitud < -81.5 ||
+        prev.longitud > -75.0 ||
+        !prev.latitud ||
+        isNaN(prev.latitud) ||
+        prev.latitud < -5.5 ||
+        prev.latitud > 1.6;
+
+      let nextLat = prev.latitud;
+      let nextLng = prev.longitud;
+
+      if (isOceanOrInvalid) {
+        const coords = getCoordinatesForPlace(newComuna, prev.parroquia, prev.ciudad, prev.provincia);
+        nextLat = coords.lat;
+        nextLng = coords.lng;
+      }
+
+      return {
+        ...prev,
+        zona: newComuna,
+        comuna: newComuna,
+        latitud: nextLat,
+        longitud: nextLng,
+      };
+    });
   };
 
   if (!isOpen) return null;
@@ -440,9 +500,20 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
                 <span className="text-cyan-400">🛰️</span>
                 <span>Reubicar Pin Satelital (Alta Precisión Techos)</span>
               </label>
-              <span className="text-[11px] text-cyan-400/90 font-mono bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-md self-start sm:self-auto">
-                {(formData.latitud ?? -1.82).toFixed(6)}, {(formData.longitud ?? -80.75).toFixed(6)}
-              </span>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handleCenterOnComuna}
+                  className="text-[10.5px] font-bold text-cyan-300 hover:text-white bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/40 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
+                  title="Restablecer el pin al centro de la comuna seleccionada"
+                >
+                  <MapPin size={11} className="text-cyan-400" />
+                  <span>Centrar en {formData.comuna || formData.zona || 'Comuna'}</span>
+                </button>
+                <span className="text-[11px] text-cyan-400/90 font-mono bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded-md">
+                  {(formData.latitud ?? -1.82).toFixed(6)}, {(formData.longitud ?? -80.75).toFixed(6)}
+                </span>
+              </div>
             </div>
             <p className="text-[11px] text-slate-400">
               Usa la capa satelital aérea para ver las construcciones y arrastra el pin directamente al techo de la propiedad.

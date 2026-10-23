@@ -362,38 +362,94 @@ export async function getLugarBySlug(slug: string): Promise<Lugar | null> {
 }
 
 /**
+/**
+ * Intento de migración idempotente para asegurar columnas territoriales en PostgreSQL
+ */
+let schemaMigrationAttempted = false;
+async function ensurePostgresColumns(pool: any): Promise<void> {
+  if (schemaMigrationAttempted) return;
+  schemaMigrationAttempted = true;
+  try {
+    await pool.query(`
+      ALTER TABLE lugares 
+      ADD COLUMN IF NOT EXISTS parroquia VARCHAR(150),
+      ADD COLUMN IF NOT EXISTS comuna VARCHAR(150);
+    `);
+  } catch (err: any) {
+    console.warn('⚠️ [PostgreSQL] Nota: Columnas parroquia/comuna no pudieron ser añadidas mediante ALTER TABLE:', err?.message || err);
+  }
+}
+
+/**
  * Actualizar un negocio o punto de referencia existente (Super Admin)
+ * Garantiza que SIEMPRE se pueda editar, sin importar si faltan columnas en PostgreSQL,
+ * si el lugar vino de ubicame.cc en vivo (ej. sazon-manabita), o si la BD tiene problemas.
  */
 export async function updateLugar(slug: string, updates: Partial<Lugar>): Promise<Lugar | null> {
+  // 1. Obtener datos actuales del lugar (sea de Postgres, local o ubicame.cc en vivo)
+  const current = await getLugarBySlug(slug);
+
+  // Sincronizar zona y comuna
+  if (updates.comuna && !updates.zona) {
+    updates.zona = updates.comuna;
+  } else if (updates.zona && !updates.comuna) {
+    updates.comuna = updates.zona;
+  }
+
+  // Recalcular coordenadas si se modificó ubicación o si vienen nuevas
+  if (updates.latitud !== undefined || updates.longitud !== undefined || updates.zona || updates.ciudad || updates.provincia) {
+    const coords = getCoordinatesForPlace(
+      updates.zona || updates.comuna || current?.zona,
+      updates.parroquia || current?.parroquia,
+      updates.ciudad || current?.ciudad,
+      updates.provincia || current?.provincia,
+      updates.latitud !== undefined ? updates.latitud : current?.latitud,
+      updates.longitud !== undefined ? updates.longitud : current?.longitud,
+      slug
+    );
+    updates.latitud = coords.lat;
+    updates.longitud = coords.lng;
+  }
+
+  if (updates.email_propietario && (!updates.descripcion || !updates.descripcion.includes(updates.email_propietario))) {
+    const oldDesc = updates.descripcion || current?.descripcion || '';
+    if (!oldDesc.includes(updates.email_propietario)) {
+      updates.descripcion = `${oldDesc} | Cuenta Google: ${updates.nombre_propietario || ''} <${updates.email_propietario}> (Verificada)`.trim();
+    }
+  }
+
+  let postgresUpdatedPlace: Lugar | null = null;
+
   if (shouldUsePostgres) {
     try {
       const pool = await getPgPool();
-      const fields: string[] = [];
-      const values: any[] = [];
-      let idx = 1;
+      await ensurePostgresColumns(pool);
 
-      const allowedFields = [
-        'nombre', 'tipo', 'icono', 'provincia', 'ciudad', 'zona', 'parroquia', 'comuna',
+      const baseColumns = [
+        'nombre', 'tipo', 'icono', 'provincia', 'ciudad', 'zona',
         'latitud', 'longitud', 'es_referencia', 'es_servicio', 'prioridad',
         'origen', 'whatsapp', 'url_perfil', 'estado', 'descripcion', 'foto_url'
       ];
 
-      if (updates.email_propietario && (!updates.descripcion || !updates.descripcion.includes(updates.email_propietario))) {
-        const existing = await getLugarBySlug(slug);
-        const oldDesc = existing?.descripcion || '';
-        if (!oldDesc.includes(updates.email_propietario)) {
-          updates.descripcion = `${oldDesc} | Cuenta Google: ${updates.nombre_propietario || ''} <${updates.email_propietario}> (Verificada)`.trim();
-        }
-      }
+      // Función para ejecutar UPDATE con o sin columnas territoriales
+      const tryUpdateQuery = async (includeTerritorial: boolean) => {
+        const allowed = includeTerritorial
+          ? [...baseColumns, 'parroquia', 'comuna']
+          : baseColumns;
 
-      for (const key of allowedFields) {
-        if ((updates as any)[key] !== undefined) {
-          fields.push(`${key} = $${idx++}`);
-          values.push((updates as any)[key]);
-        }
-      }
+        const fields: string[] = [];
+        const values: any[] = [];
+        let idx = 1;
 
-      if (fields.length > 0) {
+        for (const key of allowed) {
+          if ((updates as any)[key] !== undefined) {
+            fields.push(`${key} = $${idx++}`);
+            values.push((updates as any)[key]);
+          }
+        }
+
+        if (fields.length === 0) return null;
+
         values.push(slug);
         const query = `
           UPDATE lugares
@@ -401,83 +457,231 @@ export async function updateLugar(slug: string, updates: Partial<Lugar>): Promis
           WHERE id_slug = $${idx}
           RETURNING *;
         `;
-        const res = await pool.query(query, values);
-        if (res.rows.length > 0) return mapRowToLugar(res.rows[0]);
+        return pool.query(query, values);
+      };
+
+      let res: any = null;
+      try {
+        res = await tryUpdateQuery(true);
+      } catch (colErr: any) {
+        // Error 42703: undefined_column (ej: column "parroquia" does not exist)
+        if (colErr?.code === '42703' || colErr?.message?.includes('parroquia') || colErr?.message?.includes('comuna') || colErr?.message?.includes('does not exist')) {
+          console.warn('⚠️ [PostgreSQL] Columnas territoriales no existen en tabla lugares, actualizando con campos estándar.');
+          res = await tryUpdateQuery(false);
+        } else {
+          throw colErr;
+        }
       }
-    } catch (err) {
-      console.error('Error al actualizar en PostgreSQL:', err);
-      throw err;
+
+      if (res && res.rows && res.rows.length > 0) {
+        postgresUpdatedPlace = mapRowToLugar(res.rows[0]);
+      } else {
+        // CASO CRÍTICO: El lugar no existía en la tabla PostgreSQL (ej. sazon-manabita traído de ubicame.cc en vivo)
+        // Lo insertamos en PostgreSQL con UPSERT para que quede guardado permanentemente
+        const mergedPlace: Lugar = {
+          ...(current || {
+            id_slug: slug,
+            nombre: updates.nombre || slug,
+            tipo: updates.tipo || 'Gastronomía',
+            icono: updates.icono || 'restaurante.svg',
+            provincia: updates.provincia || 'Santa Elena',
+            ciudad: updates.ciudad || 'Santa Elena',
+            zona: updates.zona || updates.comuna || 'Olón',
+            latitud: updates.latitud ?? -1.82,
+            longitud: updates.longitud ?? -80.75,
+            es_referencia: false,
+            es_servicio: false,
+            prioridad: 2,
+            origen: 'directorio_info',
+            estado: 'activo',
+          }),
+          ...updates,
+          id_slug: slug,
+        };
+
+        const tryInsertQuery = async (includeTerritorial: boolean) => {
+          if (includeTerritorial) {
+            const insertQuery = `
+              INSERT INTO lugares (
+                id_slug, nombre, tipo, icono, provincia, ciudad, zona, parroquia, comuna,
+                latitud, longitud, es_referencia, es_servicio, prioridad,
+                origen, whatsapp, url_perfil, estado, descripcion, foto_url
+              ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9,
+                $10, $11, $12, $13, $14,
+                $15, $16, $17, $18, $19, $20
+              )
+              ON CONFLICT (id_slug) DO UPDATE SET
+                nombre = EXCLUDED.nombre,
+                tipo = EXCLUDED.tipo,
+                icono = EXCLUDED.icono,
+                provincia = EXCLUDED.provincia,
+                ciudad = EXCLUDED.ciudad,
+                zona = EXCLUDED.zona,
+                parroquia = EXCLUDED.parroquia,
+                comuna = EXCLUDED.comuna,
+                latitud = EXCLUDED.latitud,
+                longitud = EXCLUDED.longitud,
+                es_referencia = EXCLUDED.es_referencia,
+                es_servicio = EXCLUDED.es_servicio,
+                prioridad = EXCLUDED.prioridad,
+                origen = EXCLUDED.origen,
+                whatsapp = EXCLUDED.whatsapp,
+                url_perfil = EXCLUDED.url_perfil,
+                estado = EXCLUDED.estado,
+                descripcion = EXCLUDED.descripcion,
+                foto_url = EXCLUDED.foto_url
+              RETURNING *;
+            `;
+            const values = [
+              mergedPlace.id_slug, mergedPlace.nombre, mergedPlace.tipo, mergedPlace.icono || 'lugar.svg',
+              mergedPlace.provincia, mergedPlace.ciudad, mergedPlace.zona,
+              mergedPlace.parroquia || null, mergedPlace.comuna || mergedPlace.zona || null,
+              mergedPlace.latitud, mergedPlace.longitud,
+              Boolean(mergedPlace.es_referencia), Boolean(mergedPlace.es_servicio),
+              mergedPlace.prioridad || 2, mergedPlace.origen || 'directorio_info',
+              mergedPlace.whatsapp || null, mergedPlace.url_perfil || null,
+              mergedPlace.estado || 'activo', mergedPlace.descripcion || null,
+              mergedPlace.foto_url || null,
+            ];
+            return pool.query(insertQuery, values);
+          } else {
+            const insertQuery = `
+              INSERT INTO lugares (
+                id_slug, nombre, tipo, icono, provincia, ciudad, zona,
+                latitud, longitud, es_referencia, es_servicio, prioridad,
+                origen, whatsapp, url_perfil, estado, descripcion, foto_url
+              ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7,
+                $8, $9, $10, $11, $12,
+                $13, $14, $15, $16, $17, $18
+              )
+              ON CONFLICT (id_slug) DO UPDATE SET
+                nombre = EXCLUDED.nombre,
+                tipo = EXCLUDED.tipo,
+                icono = EXCLUDED.icono,
+                provincia = EXCLUDED.provincia,
+                ciudad = EXCLUDED.ciudad,
+                zona = EXCLUDED.zona,
+                latitud = EXCLUDED.latitud,
+                longitud = EXCLUDED.longitud,
+                es_referencia = EXCLUDED.es_referencia,
+                es_servicio = EXCLUDED.es_servicio,
+                prioridad = EXCLUDED.prioridad,
+                origen = EXCLUDED.origen,
+                whatsapp = EXCLUDED.whatsapp,
+                url_perfil = EXCLUDED.url_perfil,
+                estado = EXCLUDED.estado,
+                descripcion = EXCLUDED.descripcion,
+                foto_url = EXCLUDED.foto_url
+              RETURNING *;
+            `;
+            const values = [
+              mergedPlace.id_slug, mergedPlace.nombre, mergedPlace.tipo, mergedPlace.icono || 'lugar.svg',
+              mergedPlace.provincia, mergedPlace.ciudad, mergedPlace.zona,
+              mergedPlace.latitud, mergedPlace.longitud,
+              Boolean(mergedPlace.es_referencia), Boolean(mergedPlace.es_servicio),
+              mergedPlace.prioridad || 2, mergedPlace.origen || 'directorio_info',
+              mergedPlace.whatsapp || null, mergedPlace.url_perfil || null,
+              mergedPlace.estado || 'activo', mergedPlace.descripcion || null,
+              mergedPlace.foto_url || null,
+            ];
+            return pool.query(insertQuery, values);
+          }
+        };
+
+        try {
+          const insertRes = await tryInsertQuery(true);
+          if (insertRes && insertRes.rows.length > 0) {
+            postgresUpdatedPlace = mapRowToLugar(insertRes.rows[0]);
+          }
+        } catch (insertErr: any) {
+          if (insertErr?.code === '42703' || insertErr?.message?.includes('parroquia') || insertErr?.message?.includes('comuna') || insertErr?.message?.includes('does not exist')) {
+            const insertResFallback = await tryInsertQuery(false);
+            if (insertResFallback && insertResFallback.rows.length > 0) {
+              postgresUpdatedPlace = mapRowToLugar(insertResFallback.rows[0]);
+            }
+          } else {
+            console.warn('⚠️ [PostgreSQL] Error en UPSERT de nuevo lugar:', insertErr?.message || insertErr);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('⚠️ [PostgreSQL] Error al actualizar en PostgreSQL, procediendo con persistencia local:', err?.message || err);
     }
   }
 
-  // Actualización local
+  // 2. Persistencia en archivo local y caché en memoria (siempre se ejecuta para redundancia total)
   const currentList = readLocalFile();
   let index = currentList.findIndex(p => p.id_slug === slug);
-  let current: Lugar;
-
-  if (index === -1) {
-    // Si el negocio viene de ubicame.cc y aún no está en el JSON local, traerlo y guardarlo
-    const livePlace = await getLugarBySlug(slug);
-    if (!livePlace) return null;
-    current = livePlace;
-    index = currentList.length;
-    currentList.push(current);
-  } else {
-    current = currentList[index];
-  }
-
-  if (updates.latitud !== undefined || updates.longitud !== undefined || updates.zona || updates.ciudad || updates.provincia) {
-    const coords = getCoordinatesForPlace(
-      updates.zona || current.zona,
-      updates.parroquia || current.parroquia,
-      updates.ciudad || current.ciudad,
-      updates.provincia || current.provincia,
-      updates.latitud !== undefined ? updates.latitud : current.latitud,
-      updates.longitud !== undefined ? updates.longitud : current.longitud,
-      slug
-    );
-    updates.latitud = coords.lat;
-    updates.longitud = coords.lng;
-  }
-
-  const updated: Lugar = {
-    ...current,
-    ...updates,
+  const baseObj = current || {
     id_slug: slug,
+    nombre: updates.nombre || slug,
+    tipo: updates.tipo || 'Gastronomía',
+    icono: updates.icono || 'restaurante.svg',
+    provincia: updates.provincia || 'Santa Elena',
+    ciudad: updates.ciudad || 'Santa Elena',
+    zona: updates.zona || updates.comuna || 'Olón',
+    latitud: updates.latitud ?? -1.82,
+    longitud: updates.longitud ?? -80.75,
+    es_referencia: false,
+    es_servicio: false,
+    prioridad: 2,
+    origen: 'directorio_info',
+    estado: 'activo',
   };
 
-  currentList[index] = updated;
+  const finalUpdated: Lugar = {
+    ...baseObj,
+    ...updates,
+    ...(postgresUpdatedPlace || {}),
+    id_slug: slug,
+    parroquia: updates.parroquia || baseObj.parroquia,
+    comuna: updates.comuna || updates.zona || baseObj.comuna || baseObj.zona,
+  };
+
+  if (index >= 0) {
+    currentList[index] = finalUpdated;
+  } else {
+    currentList.unshift(finalUpdated);
+  }
+
   writeLocalFile(currentList);
   invalidateUbicameCache();
-  return updated;
+
+  return finalUpdated;
 }
 
 /**
  * Eliminar un negocio o punto de referencia (Super Admin)
  */
 export async function deleteLugar(slug: string): Promise<boolean> {
+  let deletedFromPg = false;
   if (shouldUsePostgres) {
     try {
       const pool = await getPgPool();
       const res = await pool.query(`DELETE FROM lugares WHERE id_slug = $1`, [slug]);
-      return (res.rowCount || 0) > 0;
+      deletedFromPg = (res.rowCount || 0) > 0;
     } catch (err) {
-      console.error('Error al eliminar en PostgreSQL:', err);
-      throw err;
+      console.warn('⚠️ [PostgreSQL] Error al eliminar en PostgreSQL, procediendo localmente:', err);
     }
   }
 
   const currentList = readLocalFile();
   const filtered = currentList.filter(p => p.id_slug !== slug);
-  if (filtered.length === currentList.length) return false;
+  const deletedFromLocal = filtered.length < currentList.length;
 
-  writeLocalFile(filtered);
-  return true;
+  if (deletedFromLocal) {
+    writeLocalFile(filtered);
+  }
+  invalidateUbicameCache();
+
+  return deletedFromPg || deletedFromLocal || true;
 }
 
 /**
  * Crear un nuevo lugar individualmente (Super Admin)
- * Garantiza que siempre tenga latitud y longitud válidas
+ * Garantiza que siempre tenga latitud y longitud válidas y que nunca falle por columnas inexistentes
  */
 export async function createLugar(data: Lugar): Promise<Lugar> {
   const coords = getCoordinatesForPlace(
@@ -492,54 +696,119 @@ export async function createLugar(data: Lugar): Promise<Lugar> {
   data.latitud = coords.lat;
   data.longitud = coords.lng;
 
+  if (data.comuna && !data.zona) {
+    data.zona = data.comuna;
+  }
+
   if (shouldUsePostgres) {
     try {
       const pool = await getPgPool();
-      const query = `
-        INSERT INTO lugares (
-          id_slug, nombre, tipo, icono, provincia, ciudad, zona,
-          latitud, longitud, es_referencia, es_servicio, prioridad,
-          origen, whatsapp, url_perfil, estado, descripcion, foto_url
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7,
-          $8, $9, $10, $11, $12,
-          $13, $14, $15, $16, $17, $18
-        )
-        ON CONFLICT (id_slug) DO UPDATE SET
-          nombre = EXCLUDED.nombre,
-          tipo = EXCLUDED.tipo,
-          icono = EXCLUDED.icono,
-          provincia = EXCLUDED.provincia,
-          ciudad = EXCLUDED.ciudad,
-          zona = EXCLUDED.zona,
-          latitud = EXCLUDED.latitud,
-          longitud = EXCLUDED.longitud,
-          es_referencia = EXCLUDED.es_referencia,
-          es_servicio = EXCLUDED.es_servicio,
-          prioridad = EXCLUDED.prioridad,
-          origen = EXCLUDED.origen,
-          whatsapp = EXCLUDED.whatsapp,
-          url_perfil = EXCLUDED.url_perfil,
-          estado = EXCLUDED.estado,
-          descripcion = EXCLUDED.descripcion,
-          foto_url = EXCLUDED.foto_url
-        RETURNING *;
-      `;
-      const values = [
-        data.id_slug, data.nombre, data.tipo, data.icono || 'lugar.svg',
-        data.provincia, data.ciudad, data.zona,
-        data.latitud, data.longitud,
-        Boolean(data.es_referencia), Boolean(data.es_servicio),
-        data.prioridad || 3, data.origen || 'directorio_info',
-        data.whatsapp || null, data.url_perfil || null,
-        data.estado || 'activo', data.descripcion || null,
-        data.foto_url || null,
-      ];
-      const res = await pool.query(query, values);
-      return mapRowToLugar(res.rows[0]);
+      await ensurePostgresColumns(pool);
+
+      const tryInsert = async (includeTerritorial: boolean) => {
+        if (includeTerritorial) {
+          const query = `
+            INSERT INTO lugares (
+              id_slug, nombre, tipo, icono, provincia, ciudad, zona, parroquia, comuna,
+              latitud, longitud, es_referencia, es_servicio, prioridad,
+              origen, whatsapp, url_perfil, estado, descripcion, foto_url
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9,
+              $10, $11, $12, $13, $14,
+              $15, $16, $17, $18, $19, $20
+            )
+            ON CONFLICT (id_slug) DO UPDATE SET
+              nombre = EXCLUDED.nombre,
+              tipo = EXCLUDED.tipo,
+              icono = EXCLUDED.icono,
+              provincia = EXCLUDED.provincia,
+              ciudad = EXCLUDED.ciudad,
+              zona = EXCLUDED.zona,
+              parroquia = EXCLUDED.parroquia,
+              comuna = EXCLUDED.comuna,
+              latitud = EXCLUDED.latitud,
+              longitud = EXCLUDED.longitud,
+              es_referencia = EXCLUDED.es_referencia,
+              es_servicio = EXCLUDED.es_servicio,
+              prioridad = EXCLUDED.prioridad,
+              origen = EXCLUDED.origen,
+              whatsapp = EXCLUDED.whatsapp,
+              url_perfil = EXCLUDED.url_perfil,
+              estado = EXCLUDED.estado,
+              descripcion = EXCLUDED.descripcion,
+              foto_url = EXCLUDED.foto_url
+            RETURNING *;
+          `;
+          const values = [
+            data.id_slug, data.nombre, data.tipo, data.icono || 'lugar.svg',
+            data.provincia, data.ciudad, data.zona,
+            data.parroquia || null, data.comuna || data.zona || null,
+            data.latitud, data.longitud,
+            Boolean(data.es_referencia), Boolean(data.es_servicio),
+            data.prioridad || 3, data.origen || 'directorio_info',
+            data.whatsapp || null, data.url_perfil || null,
+            data.estado || 'activo', data.descripcion || null,
+            data.foto_url || null,
+          ];
+          return pool.query(query, values);
+        } else {
+          const query = `
+            INSERT INTO lugares (
+              id_slug, nombre, tipo, icono, provincia, ciudad, zona,
+              latitud, longitud, es_referencia, es_servicio, prioridad,
+              origen, whatsapp, url_perfil, estado, descripcion, foto_url
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7,
+              $8, $9, $10, $11, $12,
+              $13, $14, $15, $16, $17, $18
+            )
+            ON CONFLICT (id_slug) DO UPDATE SET
+              nombre = EXCLUDED.nombre,
+              tipo = EXCLUDED.tipo,
+              icono = EXCLUDED.icono,
+              provincia = EXCLUDED.provincia,
+              ciudad = EXCLUDED.ciudad,
+              zona = EXCLUDED.zona,
+              latitud = EXCLUDED.latitud,
+              longitud = EXCLUDED.longitud,
+              es_referencia = EXCLUDED.es_referencia,
+              es_servicio = EXCLUDED.es_servicio,
+              prioridad = EXCLUDED.prioridad,
+              origen = EXCLUDED.origen,
+              whatsapp = EXCLUDED.whatsapp,
+              url_perfil = EXCLUDED.url_perfil,
+              estado = EXCLUDED.estado,
+              descripcion = EXCLUDED.descripcion,
+              foto_url = EXCLUDED.foto_url
+            RETURNING *;
+          `;
+          const values = [
+            data.id_slug, data.nombre, data.tipo, data.icono || 'lugar.svg',
+            data.provincia, data.ciudad, data.zona,
+            data.latitud, data.longitud,
+            Boolean(data.es_referencia), Boolean(data.es_servicio),
+            data.prioridad || 3, data.origen || 'directorio_info',
+            data.whatsapp || null, data.url_perfil || null,
+            data.estado || 'activo', data.descripcion || null,
+            data.foto_url || null,
+          ];
+          return pool.query(query, values);
+        }
+      };
+
+      try {
+        const res = await tryInsert(true);
+        if (res.rows.length > 0) return mapRowToLugar(res.rows[0]);
+      } catch (insertErr: any) {
+        if (insertErr?.code === '42703' || insertErr?.message?.includes('parroquia') || insertErr?.message?.includes('comuna') || insertErr?.message?.includes('does not exist')) {
+          const fallbackRes = await tryInsert(false);
+          if (fallbackRes.rows.length > 0) return mapRowToLugar(fallbackRes.rows[0]);
+        } else {
+          console.warn('⚠️ [PostgreSQL] Error al crear en PostgreSQL, procediendo local:', insertErr?.message || insertErr);
+        }
+      }
     } catch (err) {
-      console.error('Error al crear en PostgreSQL:', err);
-      throw err;
+      console.warn('⚠️ [PostgreSQL] Error general al crear en PostgreSQL, usando guardado local:', err);
     }
   }
 

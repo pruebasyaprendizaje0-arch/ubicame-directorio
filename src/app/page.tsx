@@ -6,7 +6,7 @@ import { ZoneList } from '@/components/ZoneList';
 import { DynamicMap } from '@/components/DynamicMap';
 import { PlaceDetailModal } from '@/components/PlaceDetailModal';
 import { OwnerRelocateModal } from '@/components/OwnerRelocateModal';
-import { MobileBottomSheet } from '@/components/MobileBottomSheet';
+import { MobileOneHandedView } from '@/components/MobileOneHandedView';
 import {
   PROVINCIAS_ECUADOR,
   getCantonesPorProvincia,
@@ -332,8 +332,8 @@ export default function DirectoryPage() {
       </header>
 
       {/* ========================================================
-          EXPERIENCIA MÓVIL (OPCIÓN 1: GOOGLE MAPS / APPLE MAPS)
-          Uso con una sola mano: Mapa completo de fondo + Bottom Sheet
+          EXPERIENCIA MÓVIL (OPCIÓN 1: GOOGLE MAPS / AIRBNB)
+          Manejo con una sola mano: Mapa inmersivo + Carrusel swipe horizontal + Dock al pulgar
           ======================================================== */}
       {isMobile ? (
         <div className="relative flex-1 w-full h-[calc(100vh-53px)] overflow-hidden">
@@ -343,37 +343,15 @@ export default function DirectoryPage() {
               lugares={places}
               selectedPlace={selectedPlace}
               onSelectPlace={(place) => {
-                setSelectedPlace(place);
+                setSelectedPlace({ ...place });
               }}
               onClearSelection={() => setSelectedPlace(null)}
               userLocation={userLocation}
             />
           </div>
 
-          {/* 2. Botón GPS Flotante "Cerca de mí" al alcance natural del pulgar derecho */}
-          <div className="absolute bottom-[155px] right-3.5 z-30">
-            <button
-              onClick={handleToggleCercaDeMi}
-              disabled={isLocating}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl transition-all cursor-pointer active:scale-90 ${
-                cercaDeMi
-                  ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 border border-emerald-300 shadow-emerald-500/30 ring-4 ring-emerald-500/20'
-                  : 'bg-slate-900/90 text-cyan-400 border border-cyan-500/40 backdrop-blur-md shadow-black/60'
-              }`}
-              title="Mi ubicación GPS / Cerca de mí"
-            >
-              {isLocating ? (
-                <Loader2 size={20} className="animate-spin text-cyan-300" />
-              ) : cercaDeMi ? (
-                <Navigation size={20} className="rotate-45" />
-              ) : (
-                <Compass size={22} />
-              )}
-            </button>
-          </div>
-
-          {/* 3. Hoja Deslizable Inferior (Mobile Bottom Sheet) */}
-          <MobileBottomSheet
+          {/* 2. Experiencia Móvil al alcance del pulgar (Carrusel horizontal + Dock inferior) */}
+          <MobileOneHandedView
             places={places}
             selectedPlace={selectedPlace}
             onSelectPlace={handleSelectPlace}
