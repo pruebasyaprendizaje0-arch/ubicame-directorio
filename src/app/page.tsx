@@ -170,7 +170,7 @@ export default function DirectoryPage() {
 
   // Center on map and pan
   const handleViewOnMap = (place: Lugar) => {
-    setSelectedPlace(place);
+    setSelectedPlace({ ...place });
     if (!isMobile) {
       if (viewMode === 'list') {
         setViewMode('split');
@@ -345,6 +345,7 @@ export default function DirectoryPage() {
               onSelectPlace={(place) => {
                 setSelectedPlace(place);
               }}
+              onClearSelection={() => setSelectedPlace(null)}
               userLocation={userLocation}
             />
           </div>
@@ -474,6 +475,30 @@ export default function DirectoryPage() {
               <SlidersHorizontal size={16} />
             </button>
           </div>
+
+          {/* Active Territorial Filter Banner (Desktop) */}
+          {(selectedProvincia || selectedCanton || selectedParroquia || selectedComuna) && (
+            <div className="p-2 px-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-cyan-300 flex items-center justify-between gap-2 animate-fade-in">
+              <div className="flex items-center gap-2 truncate">
+                <MapPin size={13} className="text-cyan-400 shrink-0" />
+                <span className="text-slate-400 text-[11px]">Zona territorial activa:</span>
+                <span className="font-bold text-white truncate">
+                  {[selectedComuna, selectedParroquia, selectedCanton, selectedProvincia].filter(Boolean).join(' › ')}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedProvincia('');
+                  setSelectedCanton('');
+                  setSelectedParroquia('');
+                  setSelectedComuna('');
+                }}
+                className="text-xs text-rose-400 hover:text-rose-300 font-semibold underline cursor-pointer shrink-0"
+              >
+                Restablecer territorio
+              </button>
+            </div>
+          )}
 
           {/* GPS Notifications */}
           {geoError && (
@@ -705,6 +730,7 @@ export default function DirectoryPage() {
                   lugares={places}
                   selectedPlace={selectedPlace}
                   onSelectPlace={handleSelectPlace}
+                  onClearSelection={() => setSelectedPlace(null)}
                   userLocation={userLocation}
                 />
               </div>
@@ -726,6 +752,7 @@ export default function DirectoryPage() {
                 lugares={places}
                 selectedPlace={selectedPlace}
                 onSelectPlace={handleSelectPlace}
+                onClearSelection={() => setSelectedPlace(null)}
                 userLocation={userLocation}
               />
             </div>

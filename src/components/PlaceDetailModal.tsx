@@ -206,11 +206,11 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
               href={place.url_perfil}
               target="_blank"
               rel="noopener noreferrer"
-              className="col-span-2 sm:flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400 active:scale-95 transition-all shadow-md"
+              className="col-span-2 sm:flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 active:scale-95 transition-all shadow-md shadow-amber-500/25"
             >
               {renderActionIcon()}
               <span>{actionConfig.detailLabel}</span>
-              <ExternalLink size={13} className="opacity-75" />
+              <ExternalLink size={13} className="stroke-[2.5]" />
             </a>
           )}
 
@@ -219,9 +219,9 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white active:scale-95 transition-all"
+              className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-500 shadow-md shadow-emerald-950/40 active:scale-95 transition-all"
             >
-              <MessageCircle size={14} />
+              <MessageCircle size={15} />
               <span>WhatsApp</span>
             </a>
           )}
@@ -230,7 +230,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
             href={googleMapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-cyan-300 hover:text-white hover:bg-slate-700 active:scale-95 transition-all"
+            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 text-cyan-300 hover:text-white hover:bg-slate-700 border border-slate-700/80 active:scale-95 transition-all shadow-sm"
             title="Cómo llegar con Google Maps"
           >
             <Navigation size={14} />
@@ -243,7 +243,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 onViewOnMap(place);
                 onClose();
               }}
-              className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 active:scale-95 transition-all cursor-pointer"
+              className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 text-slate-100 hover:bg-cyan-500 hover:text-slate-950 hover:border-cyan-400 border border-slate-700/80 active:scale-95 transition-all cursor-pointer shadow-sm"
             >
               <MapPin size={14} />
               <span>Ver Mapa</span>

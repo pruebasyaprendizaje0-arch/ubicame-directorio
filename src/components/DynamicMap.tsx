@@ -9,6 +9,7 @@ interface DynamicMapProps {
   lugares: Lugar[];
   selectedPlace?: Lugar | null;
   onSelectPlace?: (place: Lugar) => void;
+  onClearSelection?: () => void;
   userLocation?: { lat: number; lng: number } | null;
 }
 

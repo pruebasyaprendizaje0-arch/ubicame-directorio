@@ -159,6 +159,17 @@ export const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
     ? `https://wa.me/${selectedPlace.whatsapp.replace(/\+/g, '')}`
     : undefined;
 
+  const hasTerritorialFilter = Boolean(
+    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna
+  );
+
+  const clearTerritorialFilters = () => {
+    setSelectedProvincia('');
+    setSelectedCanton('');
+    setSelectedParroquia('');
+    setSelectedComuna('');
+  };
+
   return (
     <div
       className={`fixed inset-x-0 bottom-0 z-40 bg-[#070b16]/95 backdrop-blur-xl border-t border-slate-800 shadow-[0_-10px_35px_rgba(0,0,0,0.7)] rounded-t-3xl flex flex-col transition-all duration-300 ease-out select-none ${snapClasses[snap]}`}
@@ -347,19 +358,44 @@ export const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
             {/* Botón desplegar filtros territoriales */}
             <button
               onClick={() => {
-                setShowFilters(!showFilters);
-                if (snap === 'peek') setSnap('half');
+                const nextState = !showFilters;
+                setShowFilters(nextState);
+                if (nextState && snap === 'peek') setSnap('half');
               }}
-              className={`p-2 rounded-xl border text-xs font-medium transition-colors shrink-0 ${
-                showFilters || hasActiveFilters
+              className={`p-2 rounded-xl border text-xs font-medium transition-colors shrink-0 relative ${
+                showFilters || hasTerritorialFilter
                   ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
                   : 'bg-slate-950 border-slate-800 text-slate-400'
               }`}
-              title="Filtros territoriales"
+              title="Filtro Territorial de Ecuador (4 Niveles)"
             >
               <SlidersHorizontal size={15} />
+              {hasTerritorialFilter && (
+                <span className="w-2 h-2 rounded-full bg-cyan-400 absolute top-1.5 right-1.5 ring-2 ring-slate-950 animate-pulse" />
+              )}
             </button>
           </div>
+
+          {/* Chip de territorio activo si hay algún filtro geográfico seleccionado */}
+          {hasTerritorialFilter && (
+            <div className="px-3 py-1.5 bg-cyan-950/40 border-b border-cyan-800/40 flex items-center justify-between text-[11px] text-cyan-300 shrink-0 animate-fade-in">
+              <div className="flex items-center gap-1.5 truncate pr-2">
+                <MapPin size={12} className="text-cyan-400 shrink-0" />
+                <span className="text-slate-400 text-[10.5px]">Zona:</span>
+                <span className="font-bold text-white truncate">
+                  {[selectedComuna, selectedParroquia, selectedCanton, selectedProvincia].filter(Boolean).join(' › ')}
+                </span>
+              </div>
+              <button
+                onClick={clearTerritorialFilters}
+                className="text-[10px] text-rose-400 hover:text-rose-300 font-bold shrink-0 flex items-center gap-0.5 hover:underline cursor-pointer"
+                title="Quitar filtro territorial"
+              >
+                <span>Restablecer</span>
+                <X size={11} />
+              </button>
+            </div>
+          )}
 
           {/* Quick pills bar (Scroll horizontal cómodo con el pulgar) */}
           <div className="flex items-center gap-1.5 p-2 px-3 overflow-x-auto scrollbar-none border-b border-slate-800/40 bg-[#050811]/60 shrink-0">
@@ -401,60 +437,119 @@ export const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
             ))}
           </div>
 
-          {/* Filtros territoriales desplegables (4 Niveles) */}
+          {/* Filtros territoriales desplegables (4 Niveles en Cascada) */}
           {showFilters && (
-            <div className="p-3 bg-slate-950/90 border-b border-slate-800 space-y-2 shrink-0 animate-fade-in text-xs">
-              <div className="flex items-center justify-between">
+            <div className="p-3 bg-slate-950/95 border-b border-slate-800 space-y-2.5 shrink-0 animate-fade-in text-xs">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
                 <span className="text-[10.5px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
                   <Layers size={12} />
-                  <span>Filtro Territorial de Ecuador</span>
+                  <span>Filtro Territorial de Ecuador (4 Niveles)</span>
                 </span>
-                {hasActiveFilters && (
+                {hasTerritorialFilter && (
                   <button
-                    onClick={clearAllFilters}
-                    className="text-[10.5px] text-rose-400 font-bold hover:underline"
+                    onClick={clearTerritorialFilters}
+                    className="text-[10.5px] text-rose-400 font-bold hover:underline cursor-pointer"
                   >
-                    Limpiar
+                    Restablecer
                   </button>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
+                {/* 1. Provincia */}
                 <div>
-                  <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">Provincia</label>
-                  <select
-                    value={selectedProvincia}
-                    onChange={(e) => {
-                      setSelectedProvincia(e.target.value);
-                      setSelectedCanton('');
-                      setSelectedParroquia('');
-                      setSelectedComuna('');
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] text-white"
-                  >
-                    <option value="">Todas ({provincias.length})</option>
-                    {provincias.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
+                  <label className="text-[10px] text-slate-300 font-bold mb-0.5 flex items-center gap-1">
+                    <Landmark size={10} className="text-indigo-400 shrink-0" />
+                    <span>1. Provincia</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedProvincia}
+                      onChange={(e) => {
+                        setSelectedProvincia(e.target.value);
+                        setSelectedCanton('');
+                        setSelectedParroquia('');
+                        setSelectedComuna('');
+                      }}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2 pr-6 text-[11px] text-white focus:outline-none focus:border-cyan-500 appearance-none truncate"
+                    >
+                      <option value="">Todas ({provincias.length})</option>
+                      {provincias.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={12} />
+                  </div>
                 </div>
 
+                {/* 2. Cantón */}
                 <div>
-                  <label className="text-[10px] text-slate-400 font-semibold block mb-0.5">Cantón</label>
-                  <select
-                    value={selectedCanton}
-                    onChange={(e) => {
-                      setSelectedCanton(e.target.value);
-                      setSelectedParroquia('');
-                      setSelectedComuna('');
-                    }}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2 text-[11px] text-white"
-                  >
-                    <option value="">Todos</option>
-                    {availableCantones.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <label className="text-[10px] text-slate-300 font-bold mb-0.5 flex items-center gap-1">
+                    <Building size={10} className="text-cyan-400 shrink-0" />
+                    <span>2. Cantón</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedCanton}
+                      onChange={(e) => {
+                        setSelectedCanton(e.target.value);
+                        setSelectedParroquia('');
+                        setSelectedComuna('');
+                      }}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2 pr-6 text-[11px] text-white focus:outline-none focus:border-cyan-500 appearance-none truncate"
+                    >
+                      <option value="">Todos los Cantones</option>
+                      {availableCantones.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={12} />
+                  </div>
+                </div>
+
+                {/* 3. Parroquia */}
+                <div>
+                  <label className="text-[10px] text-slate-300 font-bold mb-0.5 flex items-center gap-1">
+                    <MapPin size={10} className="text-purple-400 shrink-0" />
+                    <span>3. Parroquia</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedParroquia}
+                      onChange={(e) => {
+                        setSelectedParroquia(e.target.value);
+                        setSelectedComuna('');
+                      }}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2 pr-6 text-[11px] text-white focus:outline-none focus:border-cyan-500 appearance-none truncate"
+                    >
+                      <option value="">Todas las Parroquias</option>
+                      {availableParroquias.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={12} />
+                  </div>
+                </div>
+
+                {/* 4. Comuna / Localidad */}
+                <div>
+                  <label className="text-[10px] text-slate-300 font-bold mb-0.5 flex items-center gap-1">
+                    <Home size={10} className="text-emerald-400 shrink-0" />
+                    <span>4. Comuna / Zona</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedComuna}
+                      onChange={(e) => setSelectedComuna(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2 pr-6 text-[11px] text-white focus:outline-none focus:border-cyan-500 appearance-none truncate"
+                    >
+                      <option value="">Todas las Comunas</option>
+                      {availableComunas.map((comuna) => (
+                        <option key={comuna} value={comuna}>{comuna}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={12} />
+                  </div>
                 </div>
               </div>
             </div>
