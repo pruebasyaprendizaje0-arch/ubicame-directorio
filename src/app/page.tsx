@@ -202,7 +202,7 @@ export default function DirectoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050811] text-slate-100 flex flex-col selection:bg-cyan-500/30 overflow-x-hidden">
+    <div className="h-[100dvh] lg:min-h-screen lg:h-auto bg-[#050811] text-slate-100 flex flex-col selection:bg-cyan-500/30 overflow-hidden lg:overflow-visible">
       {/* Detail Modal (Adaptado como Bottom Sheet en móvil) */}
       {modalPlace && (
         <PlaceDetailModal
@@ -336,7 +336,7 @@ export default function DirectoryPage() {
           Manejo con una sola mano: Mapa inmersivo + Carrusel swipe horizontal + Dock al pulgar
           ======================================================== */}
       {isMobile ? (
-        <div className="relative flex-1 w-full h-[calc(100vh-53px)] overflow-hidden">
+        <div className="relative flex-1 w-full min-h-0 overflow-hidden">
           {/* 1. Mapa interactivo completo de fondo */}
           <div className="absolute inset-0 z-0">
             <DynamicMap

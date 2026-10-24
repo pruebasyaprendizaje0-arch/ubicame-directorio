@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Lugar } from '@/types/lugar';
 import { PlaceCard } from '@/components/PlaceCard';
 import { formatDistance } from '@/lib/geo';
@@ -12,7 +12,8 @@ import {
   Compass,
   Navigation,
   SlidersHorizontal,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Sparkles,
   MapPin,
   ExternalLink,
@@ -24,7 +25,6 @@ import {
   Layers,
   Map as MapIcon,
   List as ListIcon,
-  ChevronRight,
   UtensilsCrossed,
   ShoppingBag,
   Wrench,
@@ -102,53 +102,118 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   // Bottom Thumb Drawers
   const [activeDrawer, setActiveDrawer] = useState<'search' | 'filters' | null>(null);
 
-  // Carousel ref and card elements map for smooth thumb scrolling synchronization
+  // Active Card Index in Carousel
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Carousel ref and touch tracking
   const carouselRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const isProgrammaticScroll = useRef(false);
+  const isTouchingRef = useRef(false);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll carousel when a marker is clicked on the map
+  // Sync activeIndex with selectedPlace ONLY when changed from map pin click (not from carousel swipe)
   useEffect(() => {
-    if (selectedPlace && carouselRef.current) {
-      const cardEl = cardRefs.current.get(selectedPlace.id_slug);
-      if (cardEl) {
-        isProgrammaticScroll.current = true;
-        cardEl.scrollIntoView({
-          behavior: 'smooth',
-          inline: 'center',
-          block: 'nearest',
-        });
-        const timer = setTimeout(() => {
-          isProgrammaticScroll.current = false;
-        }, 500);
-        return () => clearTimeout(timer);
+    if (!selectedPlace) return;
+    const foundIdx = places.findIndex((p) => p.id_slug === selectedPlace.id_slug);
+    if (foundIdx >= 0) {
+      setActiveIndex(foundIdx);
+      // Only scroll into view if the user is NOT actively touching or flinging the carousel
+      if (!isUserScrollingRef.current && !isTouchingRef.current && carouselRef.current) {
+        const cardEl = cardRefs.current.get(selectedPlace.id_slug);
+        if (cardEl) {
+          cardEl.scrollIntoView({
+            behavior: 'smooth',
+            inline: 'center',
+            block: 'nearest',
+          });
+        }
       }
     }
-  }, [selectedPlace]);
+  }, [selectedPlace, places]);
 
-  // Handle user thumb swiping in carousel: detect centered card and focus on map
-  const handleCarouselScroll = () => {
-    if (isProgrammaticScroll.current || !carouselRef.current) return;
+  // Ultra-fluid Debounced Carousel Scroll: Allows free momentum flinging without stutter
+  const handleScroll = useCallback(() => {
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
     const container = carouselRef.current;
+    if (!container || places.length === 0) return;
+
+    // Fast calculation of closest card to update counter pill in real-time
     const centerPoint = container.scrollLeft + container.clientWidth / 2;
+    let closestIdx = 0;
+    let minDiff = Infinity;
 
-    let closestPlace: Lugar | null = null;
-    let closestDistance = Infinity;
-
-    places.forEach((place) => {
-      const el = cardRefs.current.get(place.id_slug);
-      if (el) {
-        const elCenter = el.offsetLeft + el.clientWidth / 2;
-        const distance = Math.abs(centerPoint - elCenter);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestPlace = place;
+    places.forEach((p, idx) => {
+      const cardEl = cardRefs.current.get(p.id_slug);
+      if (cardEl) {
+        const cardCenter = cardEl.offsetLeft + cardEl.clientWidth / 2;
+        const diff = Math.abs(cardCenter - centerPoint);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = idx;
         }
       }
     });
 
-    if (closestPlace && closestPlace !== selectedPlace && closestDistance < 120) {
-      onSelectPlace(closestPlace);
+    setActiveIndex(closestIdx);
+
+    // Only after the user stops scrolling completely (350ms silence)
+    scrollTimeoutRef.current = setTimeout(() => {
+      isUserScrollingRef.current = false;
+      const targetPlace = places[closestIdx];
+      if (targetPlace && targetPlace.id_slug !== selectedPlace?.id_slug) {
+        onSelectPlace(targetPlace);
+      }
+    }, 350);
+  }, [places, selectedPlace, onSelectPlace]);
+
+  // Clean up debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
+
+  // Quick navigation helpers to previous or next card
+  const handlePrevCard = () => {
+    if (activeIndex > 0) {
+      const nextIdx = activeIndex - 1;
+      const target = places[nextIdx];
+      if (target) {
+        setActiveIndex(nextIdx);
+        onSelectPlace(target);
+        const cardEl = cardRefs.current.get(target.id_slug);
+        if (cardEl) {
+          cardEl.scrollIntoView({
+            behavior: 'smooth',
+            inline: 'center',
+            block: 'nearest',
+          });
+        }
+      }
+    }
+  };
+
+  const handleNextCard = () => {
+    if (activeIndex < places.length - 1) {
+      const nextIdx = activeIndex + 1;
+      const target = places[nextIdx];
+      if (target) {
+        setActiveIndex(nextIdx);
+        onSelectPlace(target);
+        const cardEl = cardRefs.current.get(target.id_slug);
+        if (cardEl) {
+          cardEl.scrollIntoView({
+            behavior: 'smooth',
+            inline: 'center',
+            block: 'nearest',
+          });
+        }
+      }
     }
   };
 
@@ -236,7 +301,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
               className={`px-3 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95 ${
                 selectedComuna === comuna
                   ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/20'
-                : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
+                  : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
               }`}
             >
               {comuna}
@@ -256,14 +321,14 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             </span>
             <button
               onClick={() => setMobileMode('map')}
-              className="text-xs font-black text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-lg"
+              className="text-xs font-black text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-950/60 border border-cyan-800/60 px-2.5 py-1 rounded-lg cursor-pointer"
             >
               <MapIcon size={13} />
               <span>Ver en Mapa</span>
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 pb-8">
             {places.map((place) => (
               <PlaceCard
                 key={place.id_slug}
@@ -282,17 +347,64 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
       )}
 
       {/* ========================================================
-          3. CARRUSEL HORIZONTAL DESLIZABLE AL PULGAR (Modo Mapa)
+          3. CARRUSEL HORIZONTAL FLUIDO AL PULGAR (Modo Mapa)
           ======================================================== */}
       {mobileMode === 'map' && places.length > 0 && (
-        <div className="absolute bottom-[66px] left-0 right-0 z-30 pointer-events-none">
+        <div className="absolute bottom-[66px] left-0 right-0 z-30 pointer-events-none flex flex-col gap-1.5">
+          {/* Barra indicadora de posición y avance rápido para el pulgar */}
+          <div className="pointer-events-auto flex items-center justify-between px-4">
+            <div className="flex items-center gap-1.5 py-0.5 px-2.5 rounded-full bg-slate-950/85 backdrop-blur-md border border-slate-700/60 shadow-lg text-[10px] text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="font-bold text-white">
+                {activeIndex + 1} de {places.length}
+              </span>
+              <span className="text-slate-400">• Desliza libremente ↔</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePrevCard}
+                disabled={activeIndex === 0}
+                className="w-7 h-7 rounded-full bg-slate-900/90 border border-slate-700 text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
+                title="Negocio anterior"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <button
+                onClick={handleNextCard}
+                disabled={activeIndex >= places.length - 1}
+                className="w-7 h-7 rounded-full bg-slate-900/90 border border-slate-700 text-slate-200 hover:text-white disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
+                title="Siguiente negocio"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Carrusel Deslizable Horizontal con Inercia Fluida */}
           <div
             ref={carouselRef}
-            onScroll={handleCarouselScroll}
-            className="pointer-events-auto flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth px-4 pb-2 scrollbar-none"
+            onScroll={handleScroll}
+            onTouchStart={() => {
+              isTouchingRef.current = true;
+            }}
+            onTouchEnd={() => {
+              isTouchingRef.current = false;
+            }}
+            onMouseDown={() => {
+              isTouchingRef.current = true;
+            }}
+            onMouseUp={() => {
+              isTouchingRef.current = false;
+            }}
+            className="pointer-events-auto flex gap-3 overflow-x-auto px-4 pb-2 scrollbar-none overscroll-x-contain touch-pan-x"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              scrollSnapType: 'x proximity',
+            }}
           >
-            {places.map((place) => {
-              const isSelected = selectedPlace?.id_slug === place.id_slug;
+            {places.map((place, idx) => {
+              const isSelected = selectedPlace?.id_slug === place.id_slug || activeIndex === idx;
               const isP1 = place.prioridad === 1 || place.origen === 'ubicame_cc';
               const isVerified = place.prioridad === 2;
               const category = getCategoryStyle(place);
@@ -316,9 +428,12 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                     else cardRefs.current.delete(place.id_slug);
                   }}
                   onClick={() => onSelectPlace(place)}
-                  className={`snap-center shrink-0 w-[84vw] max-w-[340px] p-3 rounded-2xl transition-all duration-300 border select-none cursor-pointer ${
+                  style={{
+                    scrollSnapAlign: 'center',
+                  }}
+                  className={`shrink-0 w-[80vw] max-w-[325px] p-3 rounded-2xl transition-all duration-200 border select-none cursor-pointer ${
                     isSelected
-                      ? 'bg-[#0a0f1d]/98 border-cyan-400 shadow-[0_12px_30px_rgba(6,182,212,0.25)] scale-[1.02]'
+                      ? 'bg-[#0a0f1d]/98 border-cyan-400 shadow-[0_12px_30px_rgba(6,182,212,0.3)] scale-[1.01]'
                       : isP1
                       ? 'bg-gradient-to-b from-slate-900/95 via-amber-950/20 to-slate-900/95 border-amber-500/40 shadow-lg'
                       : 'bg-[#090d19]/95 border-slate-700/80 shadow-lg'
@@ -397,7 +512,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="py-1.5 px-2 rounded-xl text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 flex items-center justify-center gap-1 active:scale-95 transition-all truncate"
+                        className="py-2 px-2 rounded-xl text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 flex items-center justify-center gap-1 active:scale-95 transition-all truncate"
                       >
                         {renderActionIcon(actionConfig.actionType)}
                         <span className="truncate">{actionConfig.label}</span>
@@ -409,7 +524,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                           e.stopPropagation();
                           onSelectPlace(place);
                         }}
-                        className="py-1.5 px-2 rounded-xl text-[11px] font-bold bg-slate-800 text-cyan-300 border border-slate-700 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                        className="py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-800 text-cyan-300 border border-slate-700 flex items-center justify-center gap-1 active:scale-95 transition-all"
                       >
                         <ChevronRight size={13} />
                         <span>Detalles</span>
@@ -423,13 +538,13 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="py-1.5 px-2 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950/50 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                        className="py-2 px-2 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950/50 flex items-center justify-center gap-1 active:scale-95 transition-all"
                       >
                         <MessageCircle size={13} />
                         <span>WhatsApp</span>
                       </a>
                     ) : (
-                      <div className="py-1.5 px-2 rounded-xl text-[10px] text-slate-500 bg-slate-900 border border-slate-800 flex items-center justify-center">
+                      <div className="py-2 px-2 rounded-xl text-[10px] text-slate-500 bg-slate-900 border border-slate-800 flex items-center justify-center">
                         Sin WhatsApp
                       </div>
                     )}
@@ -440,7 +555,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="py-1.5 px-2 rounded-xl text-[11px] font-bold bg-slate-900 text-cyan-300 border border-slate-700/90 hover:bg-slate-800 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                      className="py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-900 text-cyan-300 border border-slate-700/90 hover:bg-slate-800 flex items-center justify-center gap-1 active:scale-95 transition-all"
                       title="Cómo llegar con Google Maps"
                     >
                       <Navigation size={12} className="rotate-45 text-cyan-400" />
@@ -456,8 +571,9 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
 
       {/* ========================================================
           4. BOTTOM FIXED ERGONOMIC DOCK (Barra de Control al Pulgar)
+          100% visible, fija con Safe Area Padding
           ======================================================== */}
-      <nav className="absolute bottom-0 left-0 right-0 z-40 bg-[#070b16]/95 backdrop-blur-2xl border-t border-slate-800 py-1.5 px-2 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] shadow-[0_-10px_25px_rgba(0,0,0,0.8)]">
+      <nav className="absolute bottom-0 left-0 right-0 z-40 bg-[#070b16]/95 backdrop-blur-2xl border-t border-slate-800 py-1.5 px-2 pb-[max(0.6rem,env(safe-area-inset-bottom,8px))] shadow-[0_-12px_28px_rgba(0,0,0,0.85)]">
         <div className="grid grid-cols-5 gap-1 max-w-md mx-auto items-center">
           {/* 1. Botón Buscar */}
           <button
@@ -551,7 +667,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             </span>
             <button
               onClick={() => setActiveDrawer(null)}
-              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
+              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
             >
               <X size={16} />
             </button>
@@ -570,7 +686,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -596,7 +712,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
 
           <button
             onClick={() => setActiveDrawer(null)}
-            className="w-full mt-3 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 active:scale-98 transition-all"
+            className="w-full mt-3 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-bold text-xs shadow-md shadow-cyan-500/20 active:scale-98 transition-all cursor-pointer"
           >
             Ver {places.length} Resultados
           </button>
@@ -615,7 +731,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             </span>
             <button
               onClick={() => setActiveDrawer(null)}
-              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
+              className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
             >
               <X size={16} />
             </button>
@@ -719,14 +835,14 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             {hasTerritorialFilter && (
               <button
                 onClick={clearTerritorialFilters}
-                className="py-2.5 px-3 rounded-xl bg-slate-800 text-rose-300 border border-rose-500/30 text-xs font-bold active:scale-95 transition-all"
+                className="py-2.5 px-3 rounded-xl bg-slate-800 text-rose-300 border border-rose-500/30 text-xs font-bold active:scale-95 transition-all cursor-pointer"
               >
                 Restablecer
               </button>
             )}
             <button
               onClick={() => setActiveDrawer(null)}
-              className="flex-1 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs shadow-md shadow-cyan-500/20 active:scale-95 transition-all"
+              className="flex-1 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs shadow-md shadow-cyan-500/20 active:scale-95 transition-all cursor-pointer"
             >
               Aplicar ({places.length} Lugares)
             </button>

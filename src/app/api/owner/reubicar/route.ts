@@ -9,6 +9,18 @@ function cleanPhone(phone?: string): string {
   return phone.replace(/\D/g, '');
 }
 
+/**
+ * Valida si el teléfono provisto coincide con el registrado del negocio.
+ * Compara los últimos 8 dígitos para ser inmune a formatos con/sin código de país (593) o cero inicial (09).
+ */
+function isMatchingPhone(provided?: string, registered?: string): boolean {
+  const p = cleanPhone(provided);
+  const r = cleanPhone(registered);
+  if (!p || !r) return false;
+  if (p.length < 7 || r.length < 7) return false;
+  return p.slice(-8) === r.slice(-8);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -48,43 +60,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Verificar autorización flexible y sin bloqueos
+    // 2. Verificar autorización: SOLO el negocio registrado o el Super Admin
     const adminToken = request.cookies.get('admin_session')?.value;
     const adminSession = verifySessionToken(adminToken);
     const isSuperAdminCookie = Boolean(adminSession);
-    const isSuperAdminPass = admin_password && admin_password === (process.env.ADMIN_PASSWORD || 'Frhc1971*');
+    const isSuperAdminPass = Boolean(
+      admin_password &&
+      admin_password.trim() === (process.env.ADMIN_PASSWORD || 'Frhc1971*')
+    );
     const isSuperAdmin = isSuperAdminCookie || isSuperAdminPass;
 
     let isAuthorized = false;
     let shouldClaimOwnership = false;
     let claimEmail = '';
     let claimName = '';
+    let authorLabel = '';
 
     const userEmail = google_user?.email?.toLowerCase().trim();
     const userName = google_user?.name?.trim() || 'Propietario Verificado';
 
-    // A. Si es Super Admin -> Autorizado de inmediato
+    // A. Super Admin: Autorización total
     if (isSuperAdmin) {
       isAuthorized = true;
+      authorLabel = 'Super Administrador';
     }
-    // B. Si está en entorno local o de desarrollo -> Autorizado de inmediato (para pruebas fluidas)
-    else if (process.env.NODE_ENV !== 'production' || process.env.USE_LOCAL_DATA === 'true' || !process.env.DATABASE_URL) {
-      isAuthorized = true;
-      if (userEmail) {
+    // B. Propietario del negocio vía WhatsApp registrado
+    else if (claim_whatsapp) {
+      if (place.whatsapp && isMatchingPhone(claim_whatsapp, place.whatsapp)) {
+        isAuthorized = true;
         shouldClaimOwnership = true;
-        claimEmail = userEmail;
-        claimName = userName;
+        claimEmail = `whatsapp:${cleanPhone(claim_whatsapp)}`;
+        claimName = place.nombre;
+        authorLabel = `Dueño Verificado (WhatsApp: ...${cleanPhone(claim_whatsapp).slice(-4)})`;
+      } else {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `El número de WhatsApp ingresado no coincide con el teléfono registrado para "${place.nombre}". Solo el propietario del negocio o el Super Administrador pueden reubicarlo.`,
+          },
+          { status: 403 }
+        );
       }
     }
-    // C. Si envió cuenta de Google
+    // C. Propietario del negocio vía cuenta de Google registrada
     else if (userEmail) {
       const placeOwnerEmail = (place.email_propietario || '').toLowerCase().trim();
       const descOwnerMatch = place.descripcion?.toLowerCase().includes(userEmail);
 
       if (placeOwnerEmail && (placeOwnerEmail === userEmail || descOwnerMatch)) {
         isAuthorized = true;
+        authorLabel = `Dueño (${userEmail})`;
       } else if (!placeOwnerEmail && descOwnerMatch) {
         isAuthorized = true;
+        authorLabel = `Dueño (${userEmail})`;
       } else if (placeOwnerEmail && placeOwnerEmail !== userEmail) {
         return NextResponse.json(
           {
@@ -94,40 +122,22 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       } else {
-        // El negocio no tenía dueño registrado -> vinculamos a este usuario de Google
-        isAuthorized = true;
-        shouldClaimOwnership = true;
-        claimEmail = userEmail;
-        claimName = userName;
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `El correo "${userEmail}" no figura como propietario registrado de "${place.nombre}". Ingresa el WhatsApp del negocio o accede como Super Admin.`,
+          },
+          { status: 403 }
+        );
       }
-    }
-    // D. Si envió WhatsApp que coincide con el teléfono registrado del local
-    else if (claim_whatsapp) {
-      const registeredPhone = cleanPhone(place.whatsapp);
-      const providedPhone = cleanPhone(claim_whatsapp);
-      if (
-        registeredPhone &&
-        providedPhone.length >= 7 &&
-        (registeredPhone.endsWith(providedPhone.slice(-7)) || providedPhone.endsWith(registeredPhone.slice(-7)))
-      ) {
-        isAuthorized = true;
-        shouldClaimOwnership = true;
-        claimEmail = `whatsapp:${providedPhone}`;
-        claimName = place.nombre;
-      } else {
-        isAuthorized = true; // Permitir actualización comunitaria
-      }
-    }
-    // E. Si el negocio no tiene propietario exclusivo asignado -> Permitir reubicación comunitaria
-    else if (!place.email_propietario) {
-      isAuthorized = true;
     }
 
+    // Si no cumplió ninguna de las condiciones anteriores, DENEGAR rotundamente
     if (!isAuthorized) {
       return NextResponse.json(
         {
           ok: false,
-          error: 'No se pudo verificar la autorización para reubicar este negocio. Conéctate con Google o ingresa el WhatsApp registrado.',
+          error: 'Acceso denegado: Esta acción está reservada exclusivamente para el negocio registrado o para el Super Administrador.',
         },
         { status: 403 }
       );
@@ -148,14 +158,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Guardar permanentemente en base de datos o archivo JSON
+    // Guardar permanentemente en base de datos PostgreSQL o archivo JSON
     const updatedPlace = await updateLugar(id_slug, updates);
 
     return NextResponse.json({
       ok: true,
       mensaje: '¡Ubicación satelital reubicada y guardada exitosamente!',
       lugar: updatedPlace,
-      autor: isSuperAdmin ? 'Super Administrador' : userEmail ? `Dueño (${userEmail})` : 'Reubicación Satelital Directa',
+      autor: authorLabel,
     });
   } catch (error: any) {
     console.error('Error en POST /api/owner/reubicar:', error);

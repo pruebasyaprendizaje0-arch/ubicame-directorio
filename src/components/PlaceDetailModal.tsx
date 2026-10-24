@@ -37,6 +37,20 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   onRelocate,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    fetch('/api/admin/auth/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.authenticated) setIsAdmin(true);
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   if (!place) return null;
 
@@ -271,16 +285,24 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 onRelocate(place);
                 onClose();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/90 border border-cyan-500/30 transition-all cursor-pointer active:scale-95"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 border ${
+                isAdmin
+                  ? 'text-purple-300 hover:text-white bg-purple-950/70 hover:bg-purple-900/90 border-purple-500/40 shadow-sm'
+                  : 'text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/90 border-cyan-500/30'
+              }`}
             >
-              <span>🛰️ Soy el dueño: Reubicar</span>
+              <span>🛰️ {isAdmin ? 'Reubicar (Super Admin)' : 'Soy el dueño: Reubicar'}</span>
             </button>
           ) : (
             <a
               href={`/mi-negocio?slug=${place.id_slug}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/90 border border-cyan-500/30 transition-all active:scale-95"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 border ${
+                isAdmin
+                  ? 'text-purple-300 hover:text-white bg-purple-950/70 hover:bg-purple-900/90 border-purple-500/40 shadow-sm'
+                  : 'text-cyan-300 hover:text-white bg-cyan-950/70 hover:bg-cyan-900/90 border-cyan-500/30'
+              }`}
             >
-              <span>🛰️ Soy el dueño: Reubicar</span>
+              <span>🛰️ {isAdmin ? 'Reubicar (Super Admin)' : 'Soy el dueño: Reubicar'}</span>
             </a>
           )}
         </div>
