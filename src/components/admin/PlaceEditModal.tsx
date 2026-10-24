@@ -638,6 +638,69 @@ export const PlaceEditModal: React.FC<PlaceEditModalProps> = ({
             </div>
           </div>
 
+          {/* Portada / Banner Comercial (URL de imagen) */}
+          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <span>🖼️ URL de Portada / Banner Comercial</span>
+                <span className="text-[10.5px] text-slate-400 font-normal">
+                  (Negocios o Puntos de Interés)
+                </span>
+              </label>
+              {formData.foto_url && (
+                <a
+                  href={formData.foto_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10.5px] text-cyan-400 hover:underline flex items-center gap-1"
+                >
+                  <span>Abrir enlace</span>
+                  <ExternalLink size={10} />
+                </a>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={formData.foto_url || ''}
+                onChange={e => setFormData({ ...formData, foto_url: e.target.value })}
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 placeholder:text-slate-600"
+                placeholder="https://ejemplo.com/imagen-banner.jpg"
+              />
+              {formData.foto_url && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, foto_url: '' })}
+                  className="px-3 py-1.5 text-xs font-bold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 rounded-xl transition-colors cursor-pointer"
+                  title="Quitar foto personalizada y usar la predeterminada por rubro"
+                >
+                  Restablecer
+                </button>
+              )}
+            </div>
+
+            {formData.foto_url && (
+              <div className="relative w-full h-28 rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={formData.foto_url}
+                  alt="Vista previa del banner"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.opacity = '0.2';
+                  }}
+                />
+                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-md text-[10px] font-bold text-cyan-300 border border-cyan-500/30">
+                  Vista Previa en Vivo
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400">
+              Pega cualquier enlace público de imagen (JPG, PNG, WebP). Si se deja vacío, el sistema asignará automáticamente el banner temático según la categoría.
+            </p>
+          </div>
+
           {/* Flags: es_referencia, es_servicio */}
           <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-wrap items-center gap-6">
             <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">

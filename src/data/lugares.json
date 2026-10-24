@@ -394,7 +394,10 @@
     "prioridad": 2,
     "origen": "directorio_info",
     "estado": "activo",
-    "descripcion": "Monumento emblemático en la entrada principal de Montañita, punto de encuentro clave."
+    "descripcion": "Monumento emblemático en la entrada principal de Montañita, punto de encuentro clave.",
+    "parroquia": "Manglaralto",
+    "comuna": "Montañita",
+    "foto_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqfGWVp3sRfmgEeRiWdFnui8oQiJxbBoraWXNfPmqOHQ&s=10"
   },
   {
     "id_slug": "panaderia-artesanal-cadeate",

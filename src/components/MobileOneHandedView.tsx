@@ -5,7 +5,7 @@ import { Lugar } from '@/types/lugar';
 import { PlaceCard } from '@/components/PlaceCard';
 import { formatDistance } from '@/lib/geo';
 import { getPlaceActionConfig } from '@/lib/placeActions';
-import { getCategoryStyle } from '@/lib/categoryStyles';
+import { getCategoryStyle, getCategoryCoverBanner } from '@/lib/categoryStyles';
 import {
   Search,
   X,
@@ -37,6 +37,7 @@ export interface MobileOneHandedViewProps {
   places: Lugar[];
   selectedPlace: Lugar | null;
   onSelectPlace: (place: Lugar) => void;
+  onOpenDetail?: (place: Lugar) => void;
   onViewOnMap: (place: Lugar) => void;
   onClearSelectedPlace: () => void;
   // Search & GPS
@@ -70,6 +71,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   places,
   selectedPlace,
   onSelectPlace,
+  onOpenDetail,
   onViewOnMap,
   onClearSelectedPlace,
   searchQuery,
@@ -186,6 +188,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
       if (target) {
         setActiveIndex(nextIdx);
         onSelectPlace(target);
+        onViewOnMap(target);
         const cardEl = cardRefs.current.get(target.id_slug);
         if (cardEl) {
           cardEl.scrollIntoView({
@@ -205,6 +208,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
       if (target) {
         setActiveIndex(nextIdx);
         onSelectPlace(target);
+        onViewOnMap(target);
         const cardEl = cardRefs.current.get(target.id_slug);
         if (cardEl) {
           cardEl.scrollIntoView({
@@ -334,7 +338,8 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                 key={place.id_slug}
                 place={place}
                 onSelect={(p) => {
-                  onSelectPlace(p);
+                  if (onOpenDetail) onOpenDetail(p);
+                  else onSelectPlace(p);
                 }}
                 onViewOnMap={(p) => {
                   onViewOnMap(p);
@@ -381,69 +386,155 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             </div>
           </div>
 
-          {/* Carrusel Deslizable Horizontal con Inercia Fluida */}
-          <div
-            ref={carouselRef}
-            onScroll={handleScroll}
-            onTouchStart={() => {
-              isTouchingRef.current = true;
-            }}
-            onTouchEnd={() => {
-              isTouchingRef.current = false;
-            }}
-            onMouseDown={() => {
-              isTouchingRef.current = true;
-            }}
-            onMouseUp={() => {
-              isTouchingRef.current = false;
-            }}
-            className="pointer-events-auto flex gap-3 overflow-x-auto px-4 pb-2 scrollbar-none overscroll-x-contain touch-pan-x"
-            style={{
-              WebkitOverflowScrolling: 'touch',
-              scrollSnapType: 'x proximity',
-            }}
-          >
-            {places.map((place, idx) => {
-              const isSelected = selectedPlace?.id_slug === place.id_slug || activeIndex === idx;
-              const isP1 = place.prioridad === 1 || place.origen === 'ubicame_cc';
-              const isVerified = place.prioridad === 2;
-              const category = getCategoryStyle(place);
-              const actionConfig = getPlaceActionConfig(place);
+          {/* Contenedor relativo con Flechas Flotantes Laterales Táctiles al Pulgar (Opción 1) */}
+          <div className="relative w-full">
+            {/* Flecha Flotante Lateral Izquierda (Anterior) */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevCard();
+              }}
+              disabled={activeIndex === 0}
+              aria-label="Negocio anterior"
+              className={`pointer-events-auto absolute left-1.5 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-[0_6px_24px_rgba(0,0,0,0.85)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                activeIndex === 0
+                  ? 'opacity-20 pointer-events-none bg-slate-900/60 border-slate-800 text-slate-600'
+                  : 'bg-slate-950/90 hover:bg-slate-900 border-cyan-400/60 text-cyan-300 ring-2 ring-cyan-500/25 active:ring-cyan-400'
+              }`}
+            >
+              <ChevronLeft size={24} className="stroke-[2.5] -translate-x-0.5" />
+            </button>
 
-              const iconSrc =
-                place.icono.startsWith('/') || place.icono.startsWith('http')
-                  ? place.icono
-                  : `/icons/${place.icono}`;
+            {/* Flecha Flotante Lateral Derecha (Siguiente) */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextCard();
+              }}
+              disabled={activeIndex >= places.length - 1}
+              aria-label="Siguiente negocio"
+              className={`pointer-events-auto absolute right-1.5 top-1/2 -translate-y-1/2 z-40 w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-[0_6px_24px_rgba(0,0,0,0.85)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                activeIndex >= places.length - 1
+                  ? 'opacity-20 pointer-events-none bg-slate-900/60 border-slate-800 text-slate-600'
+                  : 'bg-slate-950/90 hover:bg-slate-900 border-cyan-400/60 text-cyan-300 ring-2 ring-cyan-500/25 active:ring-cyan-400'
+              }`}
+            >
+              <ChevronRight size={24} className="stroke-[2.5] translate-x-0.5" />
+            </button>
 
-              const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitud},${place.longitud}`;
-              const whatsappUrl = place.whatsapp
-                ? `https://wa.me/${place.whatsapp.replace(/\+/g, '')}`
-                : undefined;
+            {/* Carrusel Deslizable Horizontal con Inercia Fluida */}
+            <div
+              ref={carouselRef}
+              onScroll={handleScroll}
+              onTouchStart={() => {
+                isTouchingRef.current = true;
+              }}
+              onTouchEnd={() => {
+                isTouchingRef.current = false;
+              }}
+              onMouseDown={() => {
+                isTouchingRef.current = true;
+              }}
+              onMouseUp={() => {
+                isTouchingRef.current = false;
+              }}
+              className="pointer-events-auto flex gap-3 overflow-x-auto px-12 pb-2 scrollbar-none overscroll-x-contain touch-pan-x"
+              style={{
+                WebkitOverflowScrolling: 'touch',
+                scrollSnapType: 'x proximity',
+              }}
+            >
+              {places.map((place, idx) => {
+                const isSelected = selectedPlace?.id_slug === place.id_slug || activeIndex === idx;
+                const isP1 = place.prioridad === 1 || place.origen === 'ubicame_cc';
+                const isVerified = place.prioridad === 2;
+                const category = getCategoryStyle(place);
+                const coverBanner = getCategoryCoverBanner(place);
+                const actionConfig = getPlaceActionConfig(place);
 
-              return (
-                <div
-                  key={place.id_slug}
-                  ref={(el) => {
-                    if (el) cardRefs.current.set(place.id_slug, el);
-                    else cardRefs.current.delete(place.id_slug);
-                  }}
-                  onClick={() => onSelectPlace(place)}
-                  style={{
-                    scrollSnapAlign: 'center',
-                  }}
-                  className={`shrink-0 w-[80vw] max-w-[325px] p-3 rounded-2xl transition-all duration-200 border select-none cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#0a0f1d]/98 border-cyan-400 shadow-[0_12px_30px_rgba(6,182,212,0.3)] scale-[1.01]'
-                      : isP1
-                      ? 'bg-gradient-to-b from-slate-900/95 via-amber-950/20 to-slate-900/95 border-amber-500/40 shadow-lg'
-                      : 'bg-[#090d19]/95 border-slate-700/80 shadow-lg'
-                  }`}
-                >
-                  {/* Encabezado: Icono de categoría + Datos del negocio */}
-                  <div className="flex items-start justify-between gap-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                const iconSrc =
+                  place.icono.startsWith('/') || place.icono.startsWith('http')
+                    ? place.icono
+                    : `/icons/${place.icono}`;
+
+                const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitud},${place.longitud}`;
+                const whatsappUrl = place.whatsapp
+                  ? `https://wa.me/${place.whatsapp.replace(/\+/g, '')}`
+                  : undefined;
+
+                return (
+                  <div
+                    key={place.id_slug}
+                    ref={(el) => {
+                      if (el) cardRefs.current.set(place.id_slug, el);
+                      else cardRefs.current.delete(place.id_slug);
+                    }}
+                    onClick={() => {
+                      onSelectPlace(place);
+                      onViewOnMap(place);
+                    }}
+                    style={{
+                      scrollSnapAlign: 'center',
+                    }}
+                    className={`shrink-0 w-[80vw] max-w-[325px] rounded-2xl overflow-hidden transition-all duration-200 border select-none cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#0a0f1d]/98 border-cyan-400 shadow-[0_12px_30px_rgba(6,182,212,0.3)] scale-[1.01]'
+                        : isP1
+                        ? 'bg-gradient-to-b from-slate-900/95 via-amber-950/20 to-slate-900/95 border-amber-500/40 shadow-lg'
+                        : 'bg-[#090d19]/95 border-slate-700/80 shadow-lg'
+                    }`}
+                  >
+                    {/* Mini Cover Banner en cabecera de tarjeta móvil (Idea 1) */}
+                    <div className="relative w-full h-20 overflow-hidden bg-slate-950">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverBanner}
+                        alt={`Portada de ${place.nombre}`}
+                        className="w-full h-full object-cover object-center filter brightness-[0.88]"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src =
+                            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#090d19] via-[#090d19]/40 to-black/20" />
+
+                      {/* Insignias sobre la foto */}
+                      <div className="absolute top-2 left-2 flex items-center gap-1">
+                        {isP1 && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow flex items-center gap-0.5">
+                            <Sparkles size={9} className="fill-slate-950" />
+                            <span>ubicame.cc</span>
+                          </span>
+                        )}
+                        <span
+                          className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-md shadow"
+                          style={{
+                            backgroundColor: `${category.borderColor}30`,
+                            color: category.borderColor,
+                            border: `1px solid ${category.borderColor}60`,
+                          }}
+                        >
+                          {category.name}
+                        </span>
+                      </div>
+
+                      {/* Botón Explícito para Abrir Ficha Completa Únicamente al Tocarlo */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenDetail) onOpenDetail(place);
+                          else onSelectPlace(place);
+                        }}
+                        className="absolute top-2 right-2 px-2.5 py-1 rounded-full bg-slate-950/85 hover:bg-slate-900 border border-cyan-400/70 text-cyan-300 text-[10px] font-black backdrop-blur-md flex items-center gap-1 shadow-lg shadow-cyan-950/50 active:scale-90 transition-all cursor-pointer z-10"
+                        title="Ver ficha completa"
+                      >
+                        <span>Ver Ficha</span>
+                        <ChevronRight size={11} className="stroke-[3]" />
+                      </button>
+
+                      {/* Floating Avatar en esquina inferior izquierda */}
                       <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-md"
+                        className="absolute -bottom-2.5 left-3 w-10 h-10 rounded-xl flex items-center justify-center p-2 shadow-lg backdrop-blur-md"
                         style={{
                           backgroundColor: '#090e1a',
                           border: `2px solid ${category.borderColor}`,
@@ -454,39 +545,18 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                         <img
                           src={iconSrc}
                           alt={place.tipo}
-                          className="w-5 h-5 invert object-contain"
+                          className="w-full h-full invert object-contain"
                           onError={(e) => {
                             (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg';
                           }}
                         />
                       </div>
+                    </div>
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
-                            style={{
-                              color: category.borderColor,
-                              backgroundColor: `${category.borderColor}18`,
-                              border: `1px solid ${category.borderColor}40`,
-                            }}
-                          >
-                            {category.name}
-                          </span>
-                          {isP1 && (
-                            <span className="text-[9px] font-black text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1 py-0.5 rounded flex items-center gap-0.5">
-                              ★ Destacado
-                            </span>
-                          )}
-                          {isVerified && !isP1 && (
-                            <span className="text-[9px] font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-1 py-0.5 rounded flex items-center gap-0.5">
-                              <ShieldCheck size={9} />
-                              Verificado
-                            </span>
-                          )}
-                        </div>
-
-                        <h4 className="font-black text-sm text-white leading-snug mt-1 truncate">
+                    {/* Datos del Negocio */}
+                    <div className="p-3 pt-2">
+                      <div className="pl-12 min-w-0 mb-1.5">
+                        <h4 className="font-black text-sm text-white leading-snug truncate">
                           {place.nombre}
                         </h4>
 
@@ -500,71 +570,72 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                           )}
                         </div>
                       </div>
+
+                      {/* Fila de Botones de Acción al alcance inmediato del pulgar */}
+                      <div className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2 border-t border-slate-800/80">
+                        {/* Acción según Rubro (Menú, Catálogo, Cotizar, etc.) */}
+                        {place.url_perfil ? (
+                          <a
+                            href={place.url_perfil}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="py-2 px-2 rounded-xl text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 flex items-center justify-center gap-1 active:scale-95 transition-all truncate"
+                          >
+                            {renderActionIcon(actionConfig.actionType)}
+                            <span className="truncate">{actionConfig.label}</span>
+                            <ExternalLink size={10} className="stroke-[2.5] shrink-0" />
+                          </a>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onOpenDetail) onOpenDetail(place);
+                              else onSelectPlace(place);
+                            }}
+                            className="py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/60 flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                          >
+                            <ChevronRight size={13} />
+                            <span>Ver Ficha</span>
+                          </button>
+                        )}
+
+                        {/* WhatsApp Directo */}
+                        {whatsappUrl ? (
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="py-2 px-2 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950/50 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                          >
+                            <MessageCircle size={13} />
+                            <span>WhatsApp</span>
+                          </a>
+                        ) : (
+                          <div className="py-2 px-2 rounded-xl text-[10px] text-slate-500 bg-slate-900 border border-slate-800 flex items-center justify-center">
+                            Sin WhatsApp
+                          </div>
+                        )}
+
+                        {/* Navegación GPS (Google Maps) */}
+                        <a
+                          href={googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-900 text-cyan-300 border border-slate-700/90 hover:bg-slate-800 flex items-center justify-center gap-1 active:scale-95 transition-all"
+                          title="Cómo llegar con Google Maps"
+                        >
+                          <Navigation size={12} className="rotate-45 text-cyan-400" />
+                          <span>GPS</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Fila de Botones de Acción al alcance inmediato del pulgar */}
-                  <div className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2 border-t border-slate-800/80">
-                    {/* Acción según Rubro (Menú, Catálogo, Cotizar, etc.) */}
-                    {place.url_perfil ? (
-                      <a
-                        href={place.url_perfil}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="py-2 px-2 rounded-xl text-[11px] font-black bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 flex items-center justify-center gap-1 active:scale-95 transition-all truncate"
-                      >
-                        {renderActionIcon(actionConfig.actionType)}
-                        <span className="truncate">{actionConfig.label}</span>
-                        <ExternalLink size={10} className="stroke-[2.5] shrink-0" />
-                      </a>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectPlace(place);
-                        }}
-                        className="py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-800 text-cyan-300 border border-slate-700 flex items-center justify-center gap-1 active:scale-95 transition-all"
-                      >
-                        <ChevronRight size={13} />
-                        <span>Detalles</span>
-                      </button>
-                    )}
-
-                    {/* WhatsApp Directo */}
-                    {whatsappUrl ? (
-                      <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="py-2 px-2 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950/50 flex items-center justify-center gap-1 active:scale-95 transition-all"
-                      >
-                        <MessageCircle size={13} />
-                        <span>WhatsApp</span>
-                      </a>
-                    ) : (
-                      <div className="py-2 px-2 rounded-xl text-[10px] text-slate-500 bg-slate-900 border border-slate-800 flex items-center justify-center">
-                        Sin WhatsApp
-                      </div>
-                    )}
-
-                    {/* Navegación GPS (Google Maps) */}
-                    <a
-                      href={googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="py-2 px-2 rounded-xl text-[11px] font-bold bg-slate-900 text-cyan-300 border border-slate-700/90 hover:bg-slate-800 flex items-center justify-center gap-1 active:scale-95 transition-all"
-                      title="Cómo llegar con Google Maps"
-                    >
-                      <Navigation size={12} className="rotate-45 text-cyan-400" />
-                      <span>GPS</span>
-                    </a>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

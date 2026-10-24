@@ -210,6 +210,17 @@ export default function DirectoryPage() {
           onClose={() => setModalPlace(null)}
           onViewOnMap={handleViewOnMap}
           onRelocate={(p) => setRelocatePlace(p)}
+          onPlaceUpdated={(updated) => {
+            setPlaces((prev) =>
+              prev.map((p) => (p.id_slug === updated.id_slug ? updated : p))
+            );
+            if (selectedPlace?.id_slug === updated.id_slug) {
+              setSelectedPlace(updated);
+            }
+            if (modalPlace?.id_slug === updated.id_slug) {
+              setModalPlace(updated);
+            }
+          }}
         />
       )}
 
@@ -354,7 +365,10 @@ export default function DirectoryPage() {
           <MobileOneHandedView
             places={places}
             selectedPlace={selectedPlace}
-            onSelectPlace={handleSelectPlace}
+            onSelectPlace={(place) => {
+              setSelectedPlace({ ...place });
+            }}
+            onOpenDetail={handleSelectPlace}
             onViewOnMap={handleViewOnMap}
             onClearSelectedPlace={() => setSelectedPlace(null)}
             searchQuery={searchQuery}

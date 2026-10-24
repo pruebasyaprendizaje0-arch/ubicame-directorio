@@ -4,6 +4,7 @@ import React from 'react';
 import { Lugar } from '@/types/lugar';
 import { formatDistance } from '@/lib/geo';
 import { getPlaceActionConfig } from '@/lib/placeActions';
+import { getCategoryStyle, getCategoryCoverBanner } from '@/lib/categoryStyles';
 import {
   MapPin,
   MessageCircle,
@@ -27,6 +28,8 @@ interface PlaceCardProps {
 export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnMap }) => {
   const isP1 = place.prioridad === 1 || place.origen === 'ubicame_cc';
   const isVerified = place.prioridad === 2;
+  const category = getCategoryStyle(place);
+  const coverBanner = getCategoryCoverBanner(place);
 
   const iconSrc = place.icono.startsWith('/') || place.icono.startsWith('http')
     ? place.icono
@@ -55,44 +58,89 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
 
   return (
     <article
-      className={`relative rounded-xl p-4 transition-all duration-200 border ${
+      className={`relative rounded-2xl overflow-hidden transition-all duration-200 border ${
         isP1
           ? 'bg-gradient-to-b from-slate-900/95 via-amber-950/15 to-slate-900/95 border-amber-500/40 shadow-md shadow-amber-500/5 hover:border-amber-400'
-          : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+          : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
       }`}
     >
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <div className="flex items-center gap-3">
-          {/* Category SVG Icon */}
-          <div
-            className={`w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 border ${
-              isP1
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                : 'bg-slate-800/80 border-slate-700/80 text-cyan-400'
-            }`}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={iconSrc}
-              alt={place.tipo}
-              className="w-6 h-6 invert object-contain"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg';
-              }}
-            />
-          </div>
+      {/* Mini Cover Banner de Portada Comercial (Idea 1) */}
+      <div
+        onClick={() => onSelect && onSelect(place)}
+        className="relative w-full h-28 sm:h-32 overflow-hidden bg-slate-950 cursor-pointer group"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={coverBanner}
+          alt={`Portada de ${place.nombre}`}
+          className="w-full h-full object-cover object-center filter brightness-[0.88] group-hover:scale-105 transition-transform duration-500"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src =
+              'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/30 to-black/25" />
 
-          <div>
+        {/* Badges on top of cover */}
+        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
+          {isP1 ? (
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-md flex items-center gap-1">
+              <Sparkles size={10} className="fill-slate-950" />
+              <span>ubicame.cc</span>
+            </span>
+          ) : isVerified ? (
+            <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 shadow">
+              Verificado
+            </span>
+          ) : null}
+
+          <span
+            className="text-[9.5px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md shadow"
+            style={{
+              backgroundColor: `${category.borderColor}30`,
+              color: category.borderColor,
+              border: `1px solid ${category.borderColor}60`,
+            }}
+          >
+            {category.name}
+          </span>
+        </div>
+
+        {/* Floating Category Icon overlapping bottom-left */}
+        <div
+          className="absolute -bottom-2.5 left-3 w-11 h-11 rounded-xl flex items-center justify-center p-2 shadow-xl backdrop-blur-md"
+          style={{
+            backgroundColor: '#090e1a',
+            border: `2px solid ${category.borderColor}`,
+            boxShadow: `0 4px 14px ${category.glowColor}`,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={iconSrc}
+            alt={place.tipo}
+            className="w-full h-full invert object-contain"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg';
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Card Body */}
+      <div className="p-4 pt-3.5">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0">
             <h3
               onClick={() => onSelect && onSelect(place)}
-              className="text-base font-bold text-white leading-tight cursor-pointer hover:text-cyan-300 transition-colors"
+              className="text-base font-black text-white leading-tight cursor-pointer hover:text-cyan-300 transition-colors truncate"
             >
               {place.nombre}
             </h3>
-            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs text-cyan-400 mt-0.5">
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs text-cyan-400 mt-1">
               <div className="flex items-center gap-1">
                 <MapPin size={12} className="flex-shrink-0" />
-                <span>{place.zona}, {place.ciudad}</span>
+                <span className="truncate">{place.zona}, {place.ciudad}</span>
               </div>
 
               {place.distancia_km !== undefined && (
@@ -105,86 +153,61 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
           </div>
         </div>
 
-        {/* Badges */}
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          {isP1 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm">
-              <Sparkles size={11} className="text-amber-400" />
-              <span>Destacado ubicame.cc</span>
-            </span>
+        {place.descripcion && (
+          <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+            {place.descripcion}
+          </p>
+        )}
+
+        {/* Action Buttons Row */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 pt-2.5 border-t border-slate-800/80">
+          {place.url_perfil && (
+            <a
+              href={place.url_perfil}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 active:scale-95 transition-all shadow-md shadow-amber-500/20 truncate"
+            >
+              {renderActionIcon()}
+              <span className="truncate">{actionConfig.label}</span>
+              <ExternalLink size={12} className="stroke-[2.5] shrink-0" />
+            </a>
           )}
-          {isVerified && !isP1 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
-              <ShieldCheck size={11} />
-              <span>Verificado</span>
-            </span>
+
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950/40 hover:bg-emerald-500 active:scale-95 transition-all"
+            >
+              <MessageCircle size={14} />
+              <span>WhatsApp</span>
+            </a>
           )}
-          {place.es_referencia && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-purple-500/10 border border-purple-500/30 text-purple-300">
-              Punto Clave
-            </span>
+
+          {onViewOnMap && (
+            <button
+              onClick={() => onViewOnMap(place)}
+              className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 text-slate-100 border border-slate-700/80 hover:bg-cyan-500 hover:text-slate-950 hover:border-cyan-400 active:scale-95 transition-all cursor-pointer shadow-sm"
+              title="Ubicar en el mapa interactivo"
+            >
+              <MapPin size={13} />
+              <span>Mapa</span>
+            </button>
           )}
+
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 text-cyan-300 hover:text-white hover:bg-slate-700 border border-slate-700/80 active:scale-95 transition-all shadow-sm"
+            title="Cómo llegar con Google Maps"
+          >
+            <Navigation size={13} />
+            <span>GPS</span>
+          </a>
         </div>
-      </div>
-
-      {place.descripcion && (
-        <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
-          {place.descripcion}
-        </p>
-      )}
-
-      {/* Action Buttons Row: 2x2 grid on small screens, horizontal flex on tablets/PC */}
-      <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 pt-2.5 border-t border-slate-800/80">
-        {/* Enlace directo a la acción específica de ubicame.cc (Menú, Catálogo, Cotizar, Citas o Reservas) */}
-        {place.url_perfil && (
-          <a
-            href={place.url_perfil}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 active:scale-95 transition-all shadow-md shadow-amber-500/20"
-          >
-            {renderActionIcon()}
-            <span>{actionConfig.label}</span>
-            <ExternalLink size={12} className="stroke-[2.5]" />
-          </a>
-        )}
-
-        {/* WhatsApp Directo */}
-        {whatsappUrl && (
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="col-span-1 sm:flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-md shadow-emerald-950/40 hover:bg-emerald-500 active:scale-95 transition-all"
-          >
-            <MessageCircle size={14} />
-            <span>WhatsApp</span>
-          </a>
-        )}
-
-        {/* Ver en Mapa Local */}
-        {onViewOnMap && (
-          <button
-            onClick={() => onViewOnMap(place)}
-            className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 text-slate-100 border border-slate-700/80 hover:bg-cyan-500 hover:text-slate-950 hover:border-cyan-400 active:scale-95 transition-all cursor-pointer shadow-sm"
-            title="Ubicar en el mapa interactivo"
-          >
-            <MapPin size={13} />
-            <span>Mapa</span>
-          </button>
-        )}
-
-        {/* Navegación GPS Externa (Google Maps) */}
-        <a
-          href={googleMapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="col-span-1 sm:flex-none inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 text-cyan-300 hover:text-white hover:bg-slate-700 border border-slate-700/80 active:scale-95 transition-all shadow-sm"
-          title="Cómo llegar con Google Maps"
-        >
-          <Navigation size={13} />
-          <span>GPS</span>
-        </a>
       </div>
     </article>
   );

@@ -24,7 +24,7 @@ function isMatchingPhone(provided?: string, registered?: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id_slug, latitud, longitud, google_user, claim_whatsapp, admin_password } = body;
+    const { id_slug, latitud, longitud, google_user, claim_whatsapp, admin_password, foto_url } = body;
 
     if (!id_slug) {
       return NextResponse.json(
@@ -149,6 +149,11 @@ export async function POST(request: NextRequest) {
       longitud: Number(parsedLng.toFixed(6)),
       exactitud_gps: 'rooftop',
     };
+
+    if (foto_url !== undefined) {
+      const cleanBanner = foto_url ? String(foto_url).trim() : null;
+      updates.foto_url = cleanBanner || null;
+    }
 
     if (shouldClaimOwnership && claimEmail) {
       updates.email_propietario = claimEmail;

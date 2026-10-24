@@ -282,7 +282,7 @@ export function mapRestaurantToLugar(r: any): Lugar {
     url_perfil: `https://ubicame.cc/${r.slug}`,
     estado: r.isSuspended ? 'pendiente' : 'activo',
     descripcion: desc,
-    foto_url: r.logoUrl || r.coverUrl || undefined,
+    foto_url: r.coverUrl || r.bannerUrl || r.imageUrl || r.logoUrl || (r.slug === 'gitana' ? 'https://lh3.googleusercontent.com/grass-cs/AABkmLdzW8bg1HYlFnCye4q9VTgl9t29GaMcP5HCFyvzqhKmLGRjUVTEF1Bt-xrk5rewvyqvBB6eRQVBGQQYBEaE7Zhm1_EqhUQc09Ohg2N8nV5he6m6mW47hU-XYpqmFvHFrXqHXv2r=w413-h240-k-no' : undefined),
   };
 }
 

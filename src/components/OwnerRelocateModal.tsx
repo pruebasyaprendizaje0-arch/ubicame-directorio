@@ -35,6 +35,7 @@ export const OwnerRelocateModal: React.FC<OwnerRelocateModalProps> = ({
     lat: place?.latitud || -1.82,
     lng: place?.longitud || -80.75,
   });
+  const [fotoUrl, setFotoUrl] = useState(place?.foto_url || '');
 
   // Estado de sesión Super Admin
   const [isAdmin, setIsAdmin] = useState(false);
@@ -78,6 +79,7 @@ export const OwnerRelocateModal: React.FC<OwnerRelocateModalProps> = ({
         lat: place.latitud,
         lng: place.longitud,
       });
+      setFotoUrl(place.foto_url || '');
       setError(null);
       setSuccess(false);
     }
@@ -122,6 +124,7 @@ export const OwnerRelocateModal: React.FC<OwnerRelocateModalProps> = ({
           google_user: googleUser,
           claim_whatsapp: claimPhone || undefined,
           admin_password: adminPassword || undefined,
+          foto_url: fotoUrl.trim() || undefined,
         }),
       });
 
@@ -132,7 +135,12 @@ export const OwnerRelocateModal: React.FC<OwnerRelocateModalProps> = ({
       }
 
       setSuccess(true);
-      const updated = data.lugar || { ...place, latitud: coords.lat, longitud: coords.lng };
+      const updated = data.lugar || {
+        ...place,
+        latitud: coords.lat,
+        longitud: coords.lng,
+        foto_url: fotoUrl.trim() || undefined,
+      };
 
       setTimeout(() => {
         onSaved(updated);
@@ -366,6 +374,23 @@ export const OwnerRelocateModal: React.FC<OwnerRelocateModalProps> = ({
             zoom={18}
             onChange={(newCoords) => setCoords(newCoords)}
           />
+        </div>
+
+        {/* 3. Portada / Banner Comercial Opcional */}
+        <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 mb-4 space-y-1.5">
+          <label className="block text-xs font-bold text-slate-200">
+            🖼️ URL de Imagen de Portada / Banner (Opcional):
+          </label>
+          <input
+            type="url"
+            value={fotoUrl}
+            onChange={(e) => setFotoUrl(e.target.value)}
+            placeholder="https://... enlace de tu foto o banner comercial"
+            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-400 placeholder:text-slate-600"
+          />
+          <p className="text-[10.5px] text-slate-400">
+            Pega una URL de foto para personalizar el banner comercial de tu negocio. Si se deja vacío, se usa la portada predeterminada de tu rubro.
+          </p>
         </div>
 
         {/* Botones de Acción */}
