@@ -486,6 +486,7 @@ export default function DirectoryPage() {
               onClearSelection={() => setSelectedPlace(null)}
               userLocation={userLocation}
               targetLocation={targetLocation}
+              hideFloatingControls={true}
             />
           </div>
 

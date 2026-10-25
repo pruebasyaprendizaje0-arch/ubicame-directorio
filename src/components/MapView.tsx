@@ -16,6 +16,7 @@ interface MapViewProps {
   onClearSelection?: () => void;
   userLocation?: { lat: number; lng: number } | null;
   targetLocation?: { lat: number; lng: number; zoom?: number } | null;
+  hideFloatingControls?: boolean;
 }
 
 // Helper to sanitize icon path
@@ -474,6 +475,7 @@ export const MapView: React.FC<MapViewProps> = ({
   onClearSelection,
   userLocation,
   targetLocation,
+  hideFloatingControls = false,
 }) => {
   const [showLegend, setShowLegend] = useState(false);
 
@@ -489,35 +491,36 @@ export const MapView: React.FC<MapViewProps> = ({
   return (
     <div className="w-full h-full min-h-[480px] rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl relative">
       {/* Floating Category Legend & Active Spotlight Badge */}
-      <div className="absolute top-3 right-3 z-[400] flex flex-col items-end gap-1.5 pointer-events-auto">
-        {selectedPlace && (
-          <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-slate-950/90 border border-white/20 shadow-xl backdrop-blur-md text-[11px] text-white">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            <span className="font-semibold truncate max-w-[120px] sm:max-w-[180px]">
-              {selectedPlace.nombre}
-            </span>
-            {onClearSelection && (
-              <button
-                onClick={onClearSelection}
-                className="ml-0.5 p-0.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                title="Restaurar vista de todos los negocios"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-        )}
+      {!hideFloatingControls && (
+        <div className="absolute top-3 right-3 z-[400] flex flex-col items-end gap-1.5 pointer-events-auto">
+          {selectedPlace && (
+            <div className="flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-slate-950/90 border border-white/20 shadow-xl backdrop-blur-md text-[11px] text-white">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <span className="font-semibold truncate max-w-[120px] sm:max-w-[180px]">
+                {selectedPlace.nombre}
+              </span>
+              {onClearSelection && (
+                <button
+                  onClick={onClearSelection}
+                  className="ml-0.5 p-0.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title="Restaurar vista de todos los negocios"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          )}
 
-        <button
-          onClick={() => setShowLegend(!showLegend)}
-          className="flex items-center gap-1.5 py-1 px-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 shadow-lg backdrop-blur-md text-[11px] font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
-          title="Ver leyenda de colores por categoría"
-        >
-          <Layers size={12} className="text-cyan-400" />
-          <span>Categorías</span>
-        </button>
+          <button
+            onClick={() => setShowLegend(!showLegend)}
+            className="flex items-center gap-1.5 py-1 px-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 shadow-lg backdrop-blur-md text-[11px] font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+            title="Ver leyenda de colores por categoría"
+          >
+            <Layers size={12} className="text-cyan-400" />
+            <span>Categorías</span>
+          </button>
 
-        {showLegend && (
+          {showLegend && (
           <div className="p-2.5 rounded-xl bg-slate-950/95 border border-slate-800 shadow-2xl backdrop-blur-md space-y-1.5 text-[10.5px] text-slate-300 w-44">
             <div className="flex items-center justify-between pb-1 border-b border-slate-800/80 font-bold text-white text-[11px]">
               <span>Colores del Mapa</span>
@@ -559,6 +562,7 @@ export const MapView: React.FC<MapViewProps> = ({
           </div>
         )}
       </div>
+      )}
 
       <MapContainer
         center={defaultCenter}

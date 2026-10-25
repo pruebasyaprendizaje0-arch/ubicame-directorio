@@ -32,7 +32,10 @@ import {
   BedDouble,
   ShieldCheck,
   ChevronDown,
+  ChevronUp,
   Flame,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 export interface MobileOneHandedViewProps {
@@ -131,6 +134,19 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   // Active Card Index in Carousel
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // Estados para la Barra de Herramientas Vertical Flotante (Opción 1: Toggles directos On/Off)
+  const [showRadar, setShowRadar] = useState(false); // Inicia colapsado para mantener el mapa despejado
+  const [showCarousel, setShowCarousel] = useState(true); // Fichas inferiores On/Off
+  const [showTopBar, setShowTopBar] = useState(true); // Píldoras territoriales superiores On/Off
+  const [isZenMode, setIsZenMode] = useState(false); // Modo Mapa Completo / Zen On/Off
+
+  // Si se activa el filtro rápido de promociones, desplegar automáticamente el radar
+  useEffect(() => {
+    if (soloPromos) {
+      setShowRadar(true);
+    }
+  }, [soloPromos]);
+
   // Negocios con promociones o eventos activos
   const placesWithPromos = useMemo(() => {
     return places.filter((p) => p.tiene_promo && p.campana_destacada);
@@ -146,6 +162,10 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   // Sync activeIndex with selectedPlace ONLY when changed from map pin click (not from carousel swipe)
   useEffect(() => {
     if (!selectedPlace) return;
+    // Si el usuario selecciona un pin en el mapa, asegurar que el carrusel sea visible
+    if (!showCarousel && !isZenMode) {
+      setShowCarousel(true);
+    }
     const foundIdx = places.findIndex((p) => p.id_slug === selectedPlace.id_slug);
     if (foundIdx >= 0) {
       setActiveIndex(foundIdx);
@@ -282,123 +302,137 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
       {/* ========================================================
           1. TOP FLOATING BAR: Chips de Comuna & Resumen (No invasiva)
           ======================================================== */}
+      {/* ========================================================
+          1. TOP FLOATING BAR & RADAR DE PROMOS
+          Despejado por defecto; interactivo con la barra vertical
+          ======================================================== */}
       <div className="absolute top-2.5 left-2.5 right-2.5 z-30 pointer-events-none flex flex-col gap-1.5">
-        {/* Banner de filtro territorial activo si existe */}
-        {hasTerritorialFilter && (
-          <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-cyan-950/90 border border-cyan-500/40 backdrop-blur-md shadow-lg text-[11px] text-cyan-300 flex items-center justify-between gap-2 animate-fade-in">
-            <div className="flex items-center gap-1.5 truncate">
-              <MapPin size={12} className="text-cyan-400 shrink-0" />
-              <span className="font-bold text-white truncate text-[10.5px]">
-                {[selectedComuna, selectedParroquia, selectedCanton, selectedProvincia].filter(Boolean).join(' › ')}
-              </span>
-            </div>
-            <button
-              onClick={clearTerritorialFilters}
-              className="text-[10px] text-rose-400 hover:text-rose-300 font-bold underline shrink-0 cursor-pointer"
-            >
-              Restablecer
-            </button>
-          </div>
-        )}
+        {showTopBar && !isZenMode && (
+          <div className="flex flex-col gap-1.5 animate-fade-in">
+            {/* Banner de filtro territorial activo si existe */}
+            {hasTerritorialFilter && (
+              <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-cyan-950/90 border border-cyan-500/40 backdrop-blur-md shadow-lg text-[11px] text-cyan-300 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 truncate">
+                  <MapPin size={12} className="text-cyan-400 shrink-0" />
+                  <span className="font-bold text-white truncate text-[10.5px]">
+                    {[selectedComuna, selectedParroquia, selectedCanton, selectedProvincia].filter(Boolean).join(' › ')}
+                  </span>
+                </div>
+                <button
+                  onClick={clearTerritorialFilters}
+                  className="text-[10px] text-rose-400 hover:text-rose-300 font-bold underline shrink-0 cursor-pointer"
+                >
+                  Restablecer
+                </button>
+              </div>
+            )}
 
-        {/* Banner de notificación GPS activa si existe */}
-        {gpsNotification && (
-          <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-emerald-950/90 border border-emerald-500/50 backdrop-blur-md shadow-lg text-[11px] text-emerald-300 flex items-center justify-between gap-2 animate-fade-in">
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-              <span className="font-bold text-white truncate text-[10.5px]">
-                {gpsNotification}
-              </span>
-            </div>
-            {onClearGpsNotification && (
+            {/* Banner de notificación GPS activa si existe */}
+            {gpsNotification && (
+              <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-emerald-950/90 border border-emerald-500/50 backdrop-blur-md shadow-lg text-[11px] text-emerald-300 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span className="font-bold text-white truncate text-[10.5px]">
+                    {gpsNotification}
+                  </span>
+                </div>
+                {onClearGpsNotification && (
+                  <button
+                    onClick={onClearGpsNotification}
+                    className="text-slate-400 hover:text-white shrink-0 p-0.5 cursor-pointer"
+                    title="Cerrar notificación"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Fila de píldoras rápidas con selector de localidad híbrida al pulgar */}
+            <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
+              {/* Botón Selector de Localidad Híbrido */}
               <button
-                onClick={onClearGpsNotification}
-                className="text-slate-400 hover:text-white shrink-0 p-0.5 cursor-pointer"
-                title="Cerrar notificación"
+                onClick={() => setShowLocalityModal(true)}
+                className="px-3 py-1 rounded-full text-[11px] font-black whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1.5 cursor-pointer active:scale-95 bg-slate-900/95 text-cyan-300 border-cyan-500/60 hover:bg-slate-800 ring-1 ring-cyan-500/20"
               >
-                <X size={12} />
+                {cercaDeMi && nearestTown && nearestTown.distanciaKm <= 20 ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-emerald-300 font-extrabold truncate max-w-[130px]">
+                      Cerca de {nearestTown.pueblo}
+                    </span>
+                  </>
+                ) : selectedComuna ? (
+                  <>
+                    <MapPin size={12} className="text-cyan-400 shrink-0" />
+                    <span className="truncate max-w-[130px]">{selectedComuna}</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin size={12} className="text-cyan-400 shrink-0" />
+                    <span>Toda la Costa</span>
+                  </>
+                )}
+                <ChevronDown size={12} className="text-cyan-400/80 stroke-[2.5] shrink-0" />
               </button>
-            )}
+
+              <button
+                onClick={() => {
+                  setSelectedComuna('');
+                  onSelectLocality?.('');
+                }}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95 ${
+                  selectedComuna === '' && !cercaDeMi
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/20'
+                    : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
+                }`}
+              >
+                Todos ({places.length})
+              </button>
+
+              <button
+                onClick={() => setOnlyUbicameCc(!onlyUbicameCc)}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                  onlyUbicameCc
+                    ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
+                    : 'bg-slate-900/90 text-amber-300 border-amber-500/40 hover:bg-slate-800'
+                }`}
+              >
+                <Sparkles size={11} className={onlyUbicameCc ? 'text-slate-950' : 'text-amber-400'} />
+                <span>ubicame.cc</span>
+                {totalClients > 0 && <span className="opacity-80">({totalClients})</span>}
+              </button>
+
+              {/* Botón Filtro Rápido Promos & Eventos de Hoy */}
+              <button
+                onClick={() => {
+                  const nextVal = !soloPromos;
+                  setSoloPromos?.(nextVal);
+                  if (nextVal) {
+                    setShowRadar(true);
+                  }
+                }}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                  soloPromos
+                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-orange-400 font-black ring-2 ring-orange-500/30'
+                    : 'bg-slate-900/90 text-orange-400 border-orange-500/40 hover:bg-slate-800'
+                }`}
+              >
+                <Flame size={12} className={soloPromos ? 'text-slate-950 fill-current' : 'text-orange-400 fill-orange-400'} />
+                <span>Promos & Eventos</span>
+                {(totalPromos > 0 || placesWithPromos.length > 0) && (
+                  <span className={soloPromos ? 'text-slate-950 font-black' : 'text-orange-300'}>
+                    ({soloPromos ? places.length : (totalPromos || placesWithPromos.length)})
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Fila de píldoras rápidas con selector de localidad híbrida al pulgar */}
-        <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
-          {/* Botón Selector de Localidad Híbrido */}
-          <button
-            onClick={() => setShowLocalityModal(true)}
-            className="px-3 py-1 rounded-full text-[11px] font-black whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1.5 cursor-pointer active:scale-95 bg-slate-900/95 text-cyan-300 border-cyan-500/60 hover:bg-slate-800 ring-1 ring-cyan-500/20"
-          >
-            {cercaDeMi && nearestTown && nearestTown.distanciaKm <= 20 ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-emerald-300 font-extrabold truncate max-w-[130px]">
-                  Cerca de {nearestTown.pueblo}
-                </span>
-              </>
-            ) : selectedComuna ? (
-              <>
-                <MapPin size={12} className="text-cyan-400 shrink-0" />
-                <span className="truncate max-w-[130px]">{selectedComuna}</span>
-              </>
-            ) : (
-              <>
-                <MapPin size={12} className="text-cyan-400 shrink-0" />
-                <span>Toda la Costa</span>
-              </>
-            )}
-            <ChevronDown size={12} className="text-cyan-400/80 stroke-[2.5] shrink-0" />
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedComuna('');
-              onSelectLocality?.('');
-            }}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95 ${
-              selectedComuna === '' && !cercaDeMi
-                ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/20'
-                : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
-            }`}
-          >
-            Todos ({places.length})
-          </button>
-
-          <button
-            onClick={() => setOnlyUbicameCc(!onlyUbicameCc)}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
-              onlyUbicameCc
-                ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
-                : 'bg-slate-900/90 text-amber-300 border-amber-500/40 hover:bg-slate-800'
-            }`}
-          >
-            <Sparkles size={11} className={onlyUbicameCc ? 'text-slate-950' : 'text-amber-400'} />
-            <span>ubicame.cc</span>
-            {totalClients > 0 && <span className="opacity-80">({totalClients})</span>}
-          </button>
-
-          {/* Botón Filtro Rápido Promos & Eventos de Hoy */}
-          <button
-            onClick={() => setSoloPromos?.(!soloPromos)}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
-              soloPromos
-                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-orange-400 font-black ring-2 ring-orange-500/30'
-                : 'bg-slate-900/90 text-orange-400 border-orange-500/40 hover:bg-slate-800'
-            }`}
-          >
-            <Flame size={12} className={soloPromos ? 'text-slate-950 fill-current' : 'text-orange-400 fill-orange-400'} />
-            <span>Promos & Eventos</span>
-            {(totalPromos > 0 || placesWithPromos.length > 0) && (
-              <span className={soloPromos ? 'text-slate-950 font-black' : 'text-orange-300'}>
-                ({soloPromos ? places.length : (totalPromos || placesWithPromos.length)})
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Radar de Eventos & Promociones de Hoy */}
-        {placesWithPromos.length > 0 && (
-          <div className="pt-2 pb-0.5 px-0">
+        {/* Radar de Eventos & Promociones de Hoy (Desplegable con botón 🔥 de la barra vertical o filtro rápido) */}
+        {placesWithPromos.length > 0 && showRadar && !isZenMode && (
+          <div className="pointer-events-auto pt-1 pb-0.5 px-0 animate-fade-in">
             <div className="flex items-center justify-between mb-1.5 px-1">
               <div className="flex items-center gap-1.5 text-[10.5px] font-black uppercase text-orange-400 tracking-wide">
                 <Flame size={12} className="text-orange-400 fill-orange-400 animate-pulse" />
@@ -407,14 +441,23 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                   En vivo
                 </span>
               </div>
-              {soloPromos && (
+              <div className="flex items-center gap-2">
+                {soloPromos && (
+                  <button
+                    onClick={() => setSoloPromos?.(false)}
+                    className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
+                  >
+                    Ver todos
+                  </button>
+                )}
                 <button
-                  onClick={() => setSoloPromos?.(false)}
-                  className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
+                  onClick={() => setShowRadar(false)}
+                  className="p-1 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/60 cursor-pointer"
+                  title="Cerrar radar"
                 >
-                  Ver todos
+                  <X size={12} />
                 </button>
-              )}
+              </div>
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none overscroll-x-contain touch-pan-x">
@@ -468,6 +511,78 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
       </div>
 
       {/* ========================================================
+          BARRA DE HERRAMIENTAS VERTICAL FLOTANTE (OPCIÓN 1)
+          Control ergonómico al pulgar para encender/apagar capas del mapa
+          ======================================================== */}
+      {mobileMode === 'map' && (
+        <aside
+          aria-label="Herramientas del mapa"
+          className="absolute right-2.5 top-[76px] z-30 flex flex-col gap-2 items-center pointer-events-auto"
+        >
+          {/* Botón 1: 🔥 Radar de Promociones (si hay promociones activas) */}
+          {placesWithPromos.length > 0 && !isZenMode && (
+            <button
+              onClick={() => setShowRadar(!showRadar)}
+              className={`relative w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_18px_rgba(0,0,0,0.7)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                showRadar
+                  ? 'bg-gradient-to-b from-orange-500 to-amber-500 text-slate-950 border-orange-300 ring-2 ring-orange-500/50 shadow-orange-500/30 font-black'
+                  : 'bg-slate-950/85 hover:bg-slate-900 border-orange-500/40 text-orange-400'
+              }`}
+              title={showRadar ? 'Ocultar Radar de Promociones' : 'Mostrar Radar de Promociones'}
+            >
+              <Flame size={19} className={showRadar ? 'fill-slate-950' : 'fill-orange-400 animate-pulse'} />
+              <span className="absolute -top-1.5 -right-1.5 px-1 min-w-[17px] h-[17px] rounded-full bg-rose-600 border border-white text-[9px] font-black text-white flex items-center justify-center shadow">
+                {placesWithPromos.length}
+              </span>
+            </button>
+          )}
+
+          {/* Botón 2: 🃏 Carrusel de Fichas de Negocios (On/Off) */}
+          {!isZenMode && (
+            <button
+              onClick={() => setShowCarousel(!showCarousel)}
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_18px_rgba(0,0,0,0.7)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                showCarousel
+                  ? 'bg-slate-900/90 border-cyan-400 text-cyan-300 ring-2 ring-cyan-500/30'
+                  : 'bg-slate-950/85 hover:bg-slate-900 border-slate-700/80 text-slate-500'
+              }`}
+              title={showCarousel ? 'Ocultar carrusel de fichas' : 'Mostrar carrusel de fichas'}
+            >
+              <Layers size={18} className={showCarousel ? 'text-cyan-400' : 'text-slate-400'} />
+            </button>
+          )}
+
+          {/* Botón 3: 🧭 Píldoras y Filtros Superiores (On/Off) */}
+          {!isZenMode && (
+            <button
+              onClick={() => setShowTopBar(!showTopBar)}
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_18px_rgba(0,0,0,0.7)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                showTopBar
+                  ? 'bg-slate-900/90 border-indigo-400 text-indigo-300 ring-2 ring-indigo-500/30'
+                  : 'bg-slate-950/85 hover:bg-slate-900 border-slate-700/80 text-slate-500'
+              }`}
+              title={showTopBar ? 'Ocultar filtros superiores' : 'Mostrar filtros superiores'}
+            >
+              <SlidersHorizontal size={17} className={showTopBar ? 'text-indigo-400' : 'text-slate-400'} />
+            </button>
+          )}
+
+          {/* Botón 4: 🔲 Modo Zen / Pantalla Completa (Limpia toda la pantalla para explorar el mapa libremente) */}
+          <button
+            onClick={() => setIsZenMode(!isZenMode)}
+            className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_18px_rgba(0,0,0,0.7)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+              isZenMode
+                ? 'bg-gradient-to-b from-cyan-500 to-blue-600 text-slate-950 border-cyan-200 ring-2 ring-cyan-400/50 shadow-cyan-500/30 font-black'
+                : 'bg-slate-950/85 hover:bg-slate-900 border-slate-700/80 text-slate-400 hover:text-white'
+            }`}
+            title={isZenMode ? 'Salir de pantalla completa' : 'Modo mapa pantalla completa'}
+          >
+            {isZenMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+        </aside>
+      )}
+
+      {/* ========================================================
           2. VISTA DE LISTA COMPLETA VERTICAL (Si mobileMode === 'list')
           ======================================================== */}
       {mobileMode === 'list' && (
@@ -507,7 +622,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
       {/* ========================================================
           3. CARRUSEL HORIZONTAL FLUIDO AL PULGAR (Modo Mapa)
           ======================================================== */}
-      {mobileMode === 'map' && places.length > 0 && (
+      {mobileMode === 'map' && places.length > 0 && showCarousel && !isZenMode && (
         <div className="absolute bottom-[66px] left-0 right-0 z-30 pointer-events-none flex flex-col gap-1.5">
           {/* Barra indicadora de posición y avance rápido para el pulgar */}
           <div className="pointer-events-auto flex items-center justify-between px-4">
@@ -818,6 +933,33 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Píldora compacta cuando el carrusel de fichas está oculto (libera más del 85% del mapa) */}
+      {mobileMode === 'map' && places.length > 0 && !showCarousel && !isZenMode && (
+        <div className="absolute bottom-[66px] left-0 right-0 z-30 pointer-events-none flex justify-center px-4 animate-fade-in">
+          <button
+            onClick={() => setShowCarousel(true)}
+            className="pointer-events-auto flex items-center gap-2 py-2 px-4 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-cyan-500/60 shadow-[0_6px_20px_rgba(0,0,0,0.85)] backdrop-blur-md text-[11px] font-black text-cyan-300 active:scale-95 transition-all cursor-pointer ring-1 ring-cyan-500/20"
+          >
+            <Layers size={13} className="text-cyan-400" />
+            <span>Ver {places.length} fichas de negocios</span>
+            <ChevronUp size={13} className="text-cyan-400 stroke-[2.5]" />
+          </button>
+        </div>
+      )}
+
+      {/* Píldora flotante para salir del Modo Zen */}
+      {mobileMode === 'map' && isZenMode && (
+        <div className="absolute bottom-[66px] left-0 right-0 z-30 pointer-events-none flex justify-center px-4 animate-fade-in">
+          <button
+            onClick={() => setIsZenMode(false)}
+            className="pointer-events-auto flex items-center gap-1.5 py-1.5 px-3.5 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-cyan-500/50 shadow-xl backdrop-blur-md text-[10px] font-bold text-cyan-300 active:scale-95 transition-all cursor-pointer"
+          >
+            <Minimize2 size={12} className="text-cyan-400" />
+            <span>Salir de Modo Zen (Restaurar)</span>
+          </button>
         </div>
       )}
 
