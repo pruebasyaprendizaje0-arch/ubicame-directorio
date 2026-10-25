@@ -185,6 +185,27 @@
     "descripcion": "Excursiones guiadas en kayak por el estero y manglares de Olón, avistamiento de aves y actividades ecológicas."
   },
   {
+    "id_slug": "reparaciones-limon",
+    "nombre": "reparaciones limón",
+    "tipo": "Servicios Técnicos",
+    "icono": "servicio.svg",
+    "provincia": "Santa Elena",
+    "ciudad": "Santa Elena",
+    "parroquia": "Manglaralto",
+    "zona": "Manglaralto",
+    "comuna": "Manglaralto",
+    "latitud": -1.85008,
+    "longitud": -80.74396,
+    "es_referencia": false,
+    "es_servicio": true,
+    "prioridad": 1,
+    "origen": "ubicame_cc",
+    "whatsapp": "593994916012",
+    "url_perfil": "https://ubicame.cc/reparaciones-limon",
+    "estado": "activo",
+    "descripcion": "reparaciones limón en Manglaralto, Santa Elena. Menú digital y catálogo oficial en ubicame.cc."
+  },
+  {
     "id_slug": "samai-lodge-holistic-manglaralto",
     "nombre": "Samai Lodge Holistic",
     "tipo": "Alojamiento",

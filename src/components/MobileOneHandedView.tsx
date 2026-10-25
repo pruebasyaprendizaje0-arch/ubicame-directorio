@@ -31,6 +31,7 @@ import {
   Calendar,
   BedDouble,
   ShieldCheck,
+  ChevronDown,
 } from 'lucide-react';
 
 export interface MobileOneHandedViewProps {
@@ -65,6 +66,13 @@ export interface MobileOneHandedViewProps {
   clearAllFilters: () => void;
   hasActiveFilters: boolean;
   totalClients: number;
+  // Hybrid Locality Props
+  activeLocality?: string;
+  onSelectLocality?: (loc: string) => void;
+  nearestTown?: { pueblo: string; distanciaKm: number } | null;
+  realLocalities?: Array<{ name: string; count: number }>;
+  gpsNotification?: string | null;
+  onClearGpsNotification?: () => void;
 }
 
 export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
@@ -97,12 +105,21 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   clearAllFilters,
   hasActiveFilters,
   totalClients,
+  activeLocality = '',
+  onSelectLocality,
+  nearestTown,
+  realLocalities = [],
+  gpsNotification,
+  onClearGpsNotification,
 }) => {
   // Mobile Display Mode: 'map' (interactive map + thumb carousel) or 'list' (full vertical feed)
   const [mobileMode, setMobileMode] = useState<'map' | 'list'>('map');
 
   // Bottom Thumb Drawers
   const [activeDrawer, setActiveDrawer] = useState<'search' | 'filters' | null>(null);
+
+  // Modal selector de localidad híbrida (GPS o manual)
+  const [showLocalityModal, setShowLocalityModal] = useState(false);
 
   // Active Card Index in Carousel
   const [activeIndex, setActiveIndex] = useState(0);
@@ -272,12 +289,62 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
           </div>
         )}
 
-        {/* Fila de píldoras rápidas con scroll horizontal suave para el pulgar */}
+        {/* Banner de notificación GPS activa si existe */}
+        {gpsNotification && (
+          <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-emerald-950/90 border border-emerald-500/50 backdrop-blur-md shadow-lg text-[11px] text-emerald-300 flex items-center justify-between gap-2 animate-fade-in">
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              <span className="font-bold text-white truncate text-[10.5px]">
+                {gpsNotification}
+              </span>
+            </div>
+            {onClearGpsNotification && (
+              <button
+                onClick={onClearGpsNotification}
+                className="text-slate-400 hover:text-white shrink-0 p-0.5 cursor-pointer"
+                title="Cerrar notificación"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Fila de píldoras rápidas con selector de localidad híbrida al pulgar */}
         <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1">
+          {/* Botón Selector de Localidad Híbrido */}
           <button
-            onClick={() => setSelectedComuna('')}
+            onClick={() => setShowLocalityModal(true)}
+            className="px-3 py-1 rounded-full text-[11px] font-black whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1.5 cursor-pointer active:scale-95 bg-slate-900/95 text-cyan-300 border-cyan-500/60 hover:bg-slate-800 ring-1 ring-cyan-500/20"
+          >
+            {cercaDeMi && nearestTown && nearestTown.distanciaKm <= 20 ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-emerald-300 font-extrabold truncate max-w-[130px]">
+                  Cerca de {nearestTown.pueblo}
+                </span>
+              </>
+            ) : selectedComuna ? (
+              <>
+                <MapPin size={12} className="text-cyan-400 shrink-0" />
+                <span className="truncate max-w-[130px]">{selectedComuna}</span>
+              </>
+            ) : (
+              <>
+                <MapPin size={12} className="text-cyan-400 shrink-0" />
+                <span>Toda la Costa</span>
+              </>
+            )}
+            <ChevronDown size={12} className="text-cyan-400/80 stroke-[2.5] shrink-0" />
+          </button>
+
+          <button
+            onClick={() => {
+              setSelectedComuna('');
+              onSelectLocality?.('');
+            }}
             className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95 ${
-              selectedComuna === ''
+              selectedComuna === '' && !cercaDeMi
                 ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/20'
                 : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
             }`}
@@ -297,20 +364,6 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             <span>ubicame.cc</span>
             {totalClients > 0 && <span className="opacity-80">({totalClients})</span>}
           </button>
-
-          {availableComunas.slice(0, 15).map((comuna) => (
-            <button
-              key={comuna}
-              onClick={() => setSelectedComuna(selectedComuna === comuna ? '' : comuna)}
-              className={`px-3 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95 ${
-                selectedComuna === comuna
-                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/20'
-                  : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
-              }`}
-            >
-              {comuna}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -711,7 +764,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             <span className="text-[10px] font-bold mt-0.5">Territorio</span>
           </button>
 
-          {/* 5. Botón ubicame.cc (Clientes verificados) */}
+          {/* 5. Botón ubicame.cc (Clientes verificados/destacados) */}
           <button
             onClick={() => setOnlyUbicameCc(!onlyUbicameCc)}
             className={`flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer active:scale-90 ${
@@ -721,7 +774,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             }`}
           >
             <Sparkles size={18} className={onlyUbicameCc ? 'text-amber-400' : ''} />
-            <span className="text-[10px] font-bold mt-0.5">Menús</span>
+            <span className="text-[10px] font-bold mt-0.5">Destacados</span>
           </button>
         </div>
       </nav>
@@ -917,6 +970,161 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             >
               Aplicar ({places.length} Lugares)
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          6. MODAL SELECTOR DE LOCALIDAD HÍBRIDO (GPS + MANUAL)
+          ======================================================== */}
+      {showLocalityModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4 animate-fade-in pointer-events-auto"
+          onClick={() => setShowLocalityModal(false)}
+        >
+          <div
+            className="bg-[#090e1c] border-t sm:border border-slate-700/80 rounded-t-3xl sm:rounded-2xl max-w-md w-full p-4 pb-6 shadow-2xl space-y-3 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                  <MapPin size={16} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white">¿Dónde te encuentras?</h3>
+                  <p className="text-[10.5px] text-slate-400">El mapa se traslada automáticamente a tu pueblo</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLocalityModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Botón Principal: Detectar GPS en Vivo */}
+            <button
+              onClick={() => {
+                if (!cercaDeMi) onToggleCercaDeMi();
+                setShowLocalityModal(false);
+              }}
+              disabled={isLocating}
+              className="w-full p-3 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-cyan-950/80 border border-emerald-500/50 hover:border-emerald-400 text-white font-bold text-xs flex items-center justify-between shadow-lg active:scale-98 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                  {isLocating ? (
+                    <Loader2 size={18} className="animate-spin text-emerald-400" />
+                  ) : (
+                    <Compass size={18} />
+                  )}
+                </div>
+                <div className="text-left">
+                  <div className="text-[12px] font-black text-white flex items-center gap-1.5">
+                    <span>Detectar por GPS en vivo</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 uppercase tracking-wider">
+                      Auto
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-300 font-normal">
+                    {cercaDeMi && nearestTown
+                      ? `Detectado cerca de ${nearestTown.pueblo} (${formatDistance(nearestTown.distanciaKm)})`
+                      : 'Centrar el mapa donde estoy ahora mismo'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-emerald-400 shrink-0" />
+            </button>
+
+            {/* Separador */}
+            <div className="flex items-center gap-2 py-0.5">
+              <div className="h-px bg-slate-800 flex-1" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                O selecciona tu localidad
+              </span>
+              <div className="h-px bg-slate-800 flex-1" />
+            </div>
+
+            {/* Lista de Localidades Reales */}
+            <div className="space-y-1.5">
+              {/* Opción Toda la Costa */}
+              <button
+                onClick={() => {
+                  setSelectedComuna('');
+                  onSelectLocality?.('');
+                  setShowLocalityModal(false);
+                }}
+                className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer active:scale-98 ${
+                  !selectedComuna && !cercaDeMi
+                    ? 'bg-cyan-950/80 border-cyan-400 shadow-md ring-1 ring-cyan-400/40'
+                    : 'bg-slate-900/60 hover:bg-slate-800 border-slate-800/80 text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-sm">
+                    🗺️
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-bold text-white">Toda la Costa (Ruta del Spondylus)</span>
+                    <p className="text-[9.5px] text-slate-400">Ver negocios de todos los pueblos</p>
+                  </div>
+                </div>
+                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
+                  {places.length}
+                </span>
+              </button>
+
+              {(realLocalities || []).map((loc) => {
+                const isSelected = selectedComuna.toLowerCase() === loc.name.toLowerCase();
+                const icon =
+                  loc.name === 'Montañita' ? '🏄' :
+                  loc.name === 'Olón' ? '🌴' :
+                  loc.name === 'Manglaralto' ? '🐚' :
+                  loc.name === 'Cadeate' ? '🪵' : '📍';
+                const desc =
+                  loc.name === 'Montañita' ? 'Surf, vida nocturna y restaurantes' :
+                  loc.name === 'Olón' ? 'Playa extensa, cabañas y tranquilidad' :
+                  loc.name === 'Manglaralto' ? 'Cabecera parroquial y gastronomía marina' :
+                  loc.name === 'Cadeate' ? 'Tradición artesanal y madera' : 'Pueblo costero';
+
+                return (
+                  <button
+                    key={loc.name}
+                    onClick={() => {
+                      onSelectLocality?.(loc.name);
+                      setShowLocalityModal(false);
+                    }}
+                    className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between transition-all cursor-pointer active:scale-98 ${
+                      isSelected
+                        ? 'bg-cyan-950/80 border-cyan-400 shadow-md ring-1 ring-cyan-400/40'
+                        : 'bg-slate-900/60 hover:bg-slate-800 border-slate-800/80 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-sm">
+                        {icon}
+                      </div>
+                      <div>
+                        <span className={`text-[12.5px] font-bold ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                          {loc.name}
+                        </span>
+                        <p className="text-[9.5px] text-slate-400">{desc}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
+                      {loc.count} {loc.count === 1 ? 'lugar' : 'lugares'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="text-[10px] text-slate-500 text-center pt-1">
+              💾 Recordaremos tu localidad para tu próxima visita
+            </p>
           </div>
         </div>
       )}

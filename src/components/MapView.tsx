@@ -15,6 +15,7 @@ interface MapViewProps {
   onSelectPlace?: (place: Lugar) => void;
   onClearSelection?: () => void;
   userLocation?: { lat: number; lng: number } | null;
+  targetLocation?: { lat: number; lng: number; zoom?: number } | null;
 }
 
 // Helper to sanitize icon path
@@ -175,29 +176,72 @@ function createUserMarkerIcon() {
   });
 }
 
-// Controller to smoothly fly to selected place with street zoom 18 or user GPS
+// Controller to smoothly fly to selected place with street zoom 18, target locality, or user GPS
 function MapController({
   selectedPlace,
   userLocation,
+  targetLocation,
 }: {
   selectedPlace?: Lugar | null;
   userLocation?: { lat: number; lng: number } | null;
+  targetLocation?: { lat: number; lng: number; zoom?: number } | null;
 }) {
   const map = useMap();
+  const prevSelectedIdRef = useRef<string | null>(null);
+  const prevTargetRef = useRef<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const prevUserLocRef = useRef<{ lat: number; lng: number } | null>(null);
 
+  // 1. Zoom a nivel de calle (zoom 18) únicamente cuando se selecciona un lugar
   useEffect(() => {
     if (selectedPlace) {
-      // Zoom 18: high detail street and building level
-      map.flyTo([selectedPlace.latitud, selectedPlace.longitud], 18, {
-        duration: 1.25,
-        easeLinearity: 0.25,
-      });
-    } else if (userLocation) {
-      map.flyTo([userLocation.lat, userLocation.lng], 14, {
+      if (selectedPlace.id_slug !== prevSelectedIdRef.current) {
+        prevSelectedIdRef.current = selectedPlace.id_slug;
+        map.flyTo([selectedPlace.latitud, selectedPlace.longitud], 18, {
+          duration: 1.25,
+          easeLinearity: 0.25,
+        });
+      }
+    } else {
+      // IMPORTANTE: Al deseleccionar (pulsar fuera en el mapa), la cámara se queda en la zona actual.
+      // NO se ejecuta ningún flyTo de alejamiento.
+      prevSelectedIdRef.current = null;
+    }
+  }, [selectedPlace, map]);
+
+  // 2. Transición cuando el usuario cambia explícitamente de localidad o pueblo en el selector
+  useEffect(() => {
+    if (!targetLocation) return;
+    const prev = prevTargetRef.current;
+    const isSame =
+      prev &&
+      prev.lat === targetLocation.lat &&
+      prev.lng === targetLocation.lng &&
+      prev.zoom === targetLocation.zoom;
+
+    if (!isSame) {
+      prevTargetRef.current = targetLocation;
+      map.flyTo([targetLocation.lat, targetLocation.lng], targetLocation.zoom || 14.5, {
         duration: 1.2,
       });
     }
-  }, [selectedPlace, userLocation, map]);
+  }, [targetLocation, map]);
+
+  // 3. Transición cuando se activa GPS con nuevas coordenadas del usuario
+  useEffect(() => {
+    if (!userLocation) return;
+    const prev = prevUserLocRef.current;
+    const isSame =
+      prev &&
+      prev.lat === userLocation.lat &&
+      prev.lng === userLocation.lng;
+
+    if (!isSame) {
+      prevUserLocRef.current = userLocation;
+      map.flyTo([userLocation.lat, userLocation.lng], 15, {
+        duration: 1.2,
+      });
+    }
+  }, [userLocation, map]);
 
   return null;
 }
@@ -383,13 +427,16 @@ export const MapView: React.FC<MapViewProps> = ({
   onSelectPlace,
   onClearSelection,
   userLocation,
+  targetLocation,
 }) => {
   const [showLegend, setShowLegend] = useState(false);
 
-  // Center in coastal Santa Elena: Montañita / Olón / Manglaralto area (-1.82, -80.75)
-  const defaultCenter: [number, number] = userLocation
+  // Center in coastal Santa Elena: Montañita / Olón / Manglaralto area (-1.8264, -80.7521)
+  const defaultCenter: [number, number] = targetLocation
+    ? [targetLocation.lat, targetLocation.lng]
+    : userLocation
     ? [userLocation.lat, userLocation.lng]
-    : [-1.82, -80.75];
+    : [-1.8264, -80.7521];
 
   const hasSelection = Boolean(selectedPlace);
 
@@ -479,7 +526,11 @@ export const MapView: React.FC<MapViewProps> = ({
           maxZoom={19}
         />
 
-        <MapController selectedPlace={selectedPlace} userLocation={userLocation} />
+        <MapController
+          selectedPlace={selectedPlace}
+          userLocation={userLocation}
+          targetLocation={targetLocation}
+        />
         <MapClickHandler onClearSelection={onClearSelection} />
 
         {/* User GPS location marker */}

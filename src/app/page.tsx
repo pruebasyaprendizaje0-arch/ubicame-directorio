@@ -12,6 +12,9 @@ import {
   getCantonesPorProvincia,
   getParroquiasPorCanton,
   getComunasPorFiltros,
+  findNearestTownOrComuna,
+  getCoordinatesForTown,
+  formatDistance,
 } from '@/lib/geo';
 import {
   MapPin,
@@ -73,6 +76,12 @@ export default function DirectoryPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
 
+  // Hybrid Locality & Map Centering State
+  const [activeLocality, setActiveLocality] = useState<string>('');
+  const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [nearestTown, setNearestTown] = useState<{ pueblo: string; distanciaKm: number } | null>(null);
+  const [gpsNotification, setGpsNotification] = useState<string | null>(null);
+
   // Cascading territorial options
   const availableCantones = useMemo(() => {
     return getCantonesPorProvincia(selectedProvincia || undefined);
@@ -89,6 +98,90 @@ export default function DirectoryPage() {
       selectedParroquia || undefined
     );
   }, [selectedProvincia, selectedCanton, selectedParroquia]);
+
+  // Localidades reales con conteo de negocios
+  const realLocalities = useMemo(() => {
+    const counts: Record<string, number> = {};
+    places.forEach((p) => {
+      const loc = p.zona || p.ciudad || 'Otra';
+      counts[loc] = (counts[loc] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [places]);
+
+  // Manejo de cambio de localidad con centrado suave en mapa y persistencia
+  const handleSelectLocality = useCallback((localityName: string) => {
+    if (!localityName) {
+      setSelectedComuna('');
+      setActiveLocality('');
+      try {
+        localStorage.removeItem('ubicame_active_locality');
+      } catch (e) {}
+      setTargetLocation({ lat: -1.8264, lng: -80.7521, zoom: 12.5 });
+      return;
+    }
+
+    setSelectedComuna(localityName);
+    setActiveLocality(localityName);
+    try {
+      localStorage.setItem('ubicame_active_locality', localityName);
+    } catch (e) {}
+
+    const townCoords = getCoordinatesForTown(localityName);
+    if (townCoords) {
+      setTargetLocation({ lat: townCoords.lat, lng: townCoords.lng, zoom: 15 });
+    } else {
+      const inZone = places.filter(p => (p.zona || p.comuna || p.ciudad) === localityName);
+      if (inZone.length > 0) {
+        const avgLat = inZone.reduce((s, p) => s + p.latitud, 0) / inZone.length;
+        const avgLng = inZone.reduce((s, p) => s + p.longitud, 0) / inZone.length;
+        setTargetLocation({ lat: avgLat, lng: avgLng, zoom: 15 });
+      }
+    }
+  }, [places]);
+
+  // Inicialización de localidad guardada y comprobación silenciosa de permisos GPS
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ubicame_active_locality');
+      if (saved) {
+        setSelectedComuna(saved);
+        setActiveLocality(saved);
+        const coords = getCoordinatesForTown(saved);
+        if (coords) {
+          setTargetLocation({ lat: coords.lat, lng: coords.lng, zoom: 15 });
+        }
+      } else {
+        setTargetLocation({ lat: -1.8264, lng: -80.7521, zoom: 14 });
+      }
+    } catch (e) {}
+
+    if (typeof window !== 'undefined' && navigator.permissions && navigator.geolocation) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((status) => {
+        if (status.state === 'granted') {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+              setUserLocation(coords);
+              const nearest = findNearestTownOrComuna(coords.lat, coords.lng);
+              setNearestTown(nearest);
+              const saved = localStorage.getItem('ubicame_active_locality');
+              if (!saved && nearest.distanciaKm <= 15) {
+                setActiveLocality(nearest.pueblo);
+                setSelectedComuna(nearest.pueblo);
+                setTargetLocation({ lat: coords.lat, lng: coords.lng, zoom: 15.5 });
+                setCercaDeMi(true);
+              }
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 120000 }
+          );
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   // Fetch data
   const loadPlaces = useCallback(async () => {
@@ -125,11 +218,18 @@ export default function DirectoryPage() {
     loadPlaces();
   }, [loadPlaces]);
 
-  // Toggle "Cerca de mí" GPS tracking
+  // Toggle "Cerca de mí" GPS tracking con auto-detección de pueblo
   const handleToggleCercaDeMi = () => {
     if (cercaDeMi) {
       setCercaDeMi(false);
       setUserLocation(null);
+      setGpsNotification(null);
+      if (selectedComuna) {
+        const coords = getCoordinatesForTown(selectedComuna);
+        if (coords) setTargetLocation({ lat: coords.lat, lng: coords.lng, zoom: 15 });
+      } else {
+        setTargetLocation({ lat: -1.8264, lng: -80.7521, zoom: 12.5 });
+      }
       return;
     }
 
@@ -150,12 +250,25 @@ export default function DirectoryPage() {
         };
         setUserLocation(coords);
         setCercaDeMi(true);
+
+        const nearest = findNearestTownOrComuna(coords.lat, coords.lng);
+        setNearestTown(nearest);
+
+        if (nearest.distanciaKm <= 20) {
+          setActiveLocality(nearest.pueblo);
+          setSelectedComuna(nearest.pueblo);
+          setTargetLocation({ lat: coords.lat, lng: coords.lng, zoom: 15.5 });
+          setGpsNotification(`📍 Estás en ${nearest.pueblo} (${formatDistance(nearest.distanciaKm)})`);
+        } else {
+          setTargetLocation({ lat: coords.lat, lng: coords.lng, zoom: 12.5 });
+          setGpsNotification(`📍 Tu GPS detecta ${nearest.pueblo} (a ${nearest.distanciaKm} km). Mostrando lugares cercanos.`);
+        }
       },
       (err) => {
         setIsLocating(false);
         console.warn('Error obteniendo geolocalización:', err);
         if (err.code === 1) {
-          setGeoError('Permiso de GPS denegado. Habilita la ubicación en tu navegador.');
+          setGeoError('Permiso de GPS denegado. Puedes elegir tu pueblo en la lista arriba.');
         } else {
           setGeoError('No se pudo obtener tu ubicación GPS actual.');
         }
@@ -195,10 +308,16 @@ export default function DirectoryPage() {
     setSelectedCanton('');
     setSelectedParroquia('');
     setSelectedComuna('');
+    setActiveLocality('');
     setOnlyUbicameCc(false);
     setCercaDeMi(false);
     setUserLocation(null);
     setSearchQuery('');
+    setGpsNotification(null);
+    try {
+      localStorage.removeItem('ubicame_active_locality');
+    } catch (e) {}
+    setTargetLocation({ lat: -1.8264, lng: -80.7521, zoom: 12.5 });
   };
 
   return (
@@ -358,6 +477,7 @@ export default function DirectoryPage() {
               }}
               onClearSelection={() => setSelectedPlace(null)}
               userLocation={userLocation}
+              targetLocation={targetLocation}
             />
           </div>
 
@@ -394,6 +514,12 @@ export default function DirectoryPage() {
             clearAllFilters={clearAllFilters}
             hasActiveFilters={hasActiveFilters}
             totalClients={totalClients}
+            activeLocality={activeLocality}
+            onSelectLocality={handleSelectLocality}
+            nearestTown={nearestTown}
+            realLocalities={realLocalities}
+            gpsNotification={gpsNotification}
+            onClearGpsNotification={() => setGpsNotification(null)}
           />
         </div>
       ) : (
@@ -422,6 +548,23 @@ export default function DirectoryPage() {
                   <X size={16} />
                 </button>
               )}
+            </div>
+
+            {/* Selector de Localidad Rápido Desktop */}
+            <div className="relative flex-shrink-0">
+              <select
+                value={selectedComuna}
+                onChange={(e) => handleSelectLocality(e.target.value)}
+                className="bg-slate-900 border border-slate-700/80 hover:border-cyan-500/50 rounded-xl py-2.5 px-3 text-xs font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 cursor-pointer shadow-inner transition-colors"
+                title="Centrar mapa en localidad"
+              >
+                <option value="">🗺️ Toda la Costa ({places.length})</option>
+                {realLocalities.map((loc) => (
+                  <option key={loc.name} value={loc.name}>
+                    📍 {loc.name} ({loc.count})
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* "Cerca de mí" GPS Locator Button */}
@@ -724,6 +867,7 @@ export default function DirectoryPage() {
                   onSelectPlace={handleSelectPlace}
                   onClearSelection={() => setSelectedPlace(null)}
                   userLocation={userLocation}
+                  targetLocation={targetLocation}
                 />
               </div>
             </div>
@@ -746,6 +890,7 @@ export default function DirectoryPage() {
                 onSelectPlace={handleSelectPlace}
                 onClearSelection={() => setSelectedPlace(null)}
                 userLocation={userLocation}
+                targetLocation={targetLocation}
               />
             </div>
           )}

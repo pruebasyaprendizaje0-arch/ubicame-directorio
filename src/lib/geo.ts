@@ -975,9 +975,9 @@ export const BASE_TOWNS_FOR_DETECTION: Array<{
   lng: number;
 }> = [
   // Ruta del Spondylus / Costa Norte Santa Elena
-  { nombre: 'Olón', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.804, lng: -80.73 },
-  { nombre: 'Montañita', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.828, lng: -80.75 },
-  { nombre: 'Manglaralto', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -2.006, lng: -80.73 },
+  { nombre: 'Olón', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.8019, lng: -80.7569 },
+  { nombre: 'Montañita', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.8264, lng: -80.7521 },
+  { nombre: 'Manglaralto', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.8495, lng: -80.7436 },
   { nombre: 'Curía', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.77, lng: -80.74 },
   { nombre: 'San José', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.74, lng: -80.75 },
   { nombre: 'Las Núñez', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.705, lng: -80.765 },
@@ -985,7 +985,7 @@ export const BASE_TOWNS_FOR_DETECTION: Array<{
   { nombre: 'La Rinconada', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.664, lng: -80.785 },
   { nombre: 'Dos Mangas', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.845, lng: -80.685 },
   { nombre: 'Loma Alta', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.915, lng: -80.640 },
-  { nombre: 'Cadeate', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.91, lng: -80.72 },
+  { nombre: 'Cadeate', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.8824, lng: -80.7380 },
   { nombre: 'San Antonio', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.90, lng: -80.72 },
   { nombre: 'Libertador Bolívar', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.93, lng: -80.71 },
   { nombre: 'Valdivia', canton: 'Santa Elena', provincia: 'Santa Elena', lat: -1.95, lng: -80.715 },
@@ -1035,4 +1035,18 @@ export function findNearestTownOrComuna(lat: number, lng: number): NearestTownRe
     distanciaKm: Number(minDistance.toFixed(2)),
   };
 }
+
+/**
+ * Obtiene las coordenadas de un pueblo o localidad reconocida
+ */
+export function getCoordinatesForTown(townName: string): { lat: number; lng: number } | null {
+  if (!townName) return null;
+  const q = townName.trim().toLowerCase();
+  const match = BASE_TOWNS_FOR_DETECTION.find(
+    (t) => t.nombre.toLowerCase() === q || q.includes(t.nombre.toLowerCase()) || t.nombre.toLowerCase().includes(q)
+  );
+  if (match) return { lat: match.lat, lng: match.lng };
+  return null;
+}
+
 
