@@ -18,6 +18,8 @@ import {
   Calendar,
   BedDouble,
   Camera,
+  Flame,
+  Clock,
 } from 'lucide-react';
 import { Lugar } from '@/types/lugar';
 import { formatDistance } from '@/lib/geo';
@@ -31,6 +33,24 @@ interface PlaceDetailModalProps {
   onViewOnMap?: (place: Lugar) => void;
   onRelocate?: (place: Lugar) => void;
   onPlaceUpdated?: (updated: Lugar) => void;
+}
+
+function formatRemainingDays(endDateStr?: string, eventDateStr?: string): string | null {
+  const targetDateStr = eventDateStr || endDateStr;
+  if (!targetDateStr) return null;
+  try {
+    const target = new Date(targetDateStr);
+    const now = new Date();
+    const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const diffDays = Math.ceil((targetDay - today) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'Concluido';
+    if (diffDays === 0) return 'Hoy';
+    if (diffDays === 1) return 'Termina mañana';
+    return `Termina en ${diffDays} días`;
+  } catch (e) {
+    return null;
+  }
 }
 
 export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
@@ -273,6 +293,125 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           {place.descripcion && (
             <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-slate-300 text-xs sm:text-sm leading-relaxed">
               {place.descripcion}
+            </div>
+          )}
+
+          {/* Promociones, Eventos & Actividades Oficiales de ubicame.cc */}
+          {activePlace.campanas && activePlace.campanas.length > 0 && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-orange-400">
+                  <Flame size={14} className="fill-orange-400 text-orange-400" />
+                  <span>Promociones & Eventos ({activePlace.campanas.length})</span>
+                </div>
+                <span className="text-[10px] text-slate-400">Oficial en ubicame.cc</span>
+              </div>
+
+              {activePlace.campanas.map((c) => {
+                const remaining = formatRemainingDays(c.fecha_fin, c.fecha_evento);
+                const promoWhatsappUrl = activePlace.whatsapp
+                  ? `https://wa.me/${activePlace.whatsapp.replace(/\+/g, '')}?text=${encodeURIComponent(
+                      c.mensaje_whatsapp || `¡Hola ${activePlace.nombre}! Vi en su perfil de Ubicame el evento/promo *${c.titulo}* y deseo más información.`
+                    )}`
+                  : undefined;
+
+                return (
+                  <div
+                    key={c.id}
+                    className="relative rounded-2xl bg-gradient-to-br from-[#12192c] via-[#0d1424] to-[#090f1e] border border-orange-500/35 p-4 shadow-xl overflow-hidden group"
+                  >
+                    <div className="absolute top-0 right-0 w-44 h-44 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                    {/* Fila superior de insignias */}
+                    <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-rose-500/20 border border-rose-500/40 text-rose-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                          {c.badge || (c.tipo === 'EVENT' ? 'Evento Especial' : 'Promoción')}
+                        </span>
+                        {c.dias_semana && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold text-slate-300 bg-slate-800/80 border border-slate-700">
+                            {c.dias_semana}
+                          </span>
+                        )}
+                      </div>
+
+                      {remaining && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/25">
+                          <Clock size={11} className="shrink-0" />
+                          <span>{remaining}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Contenido con imagen */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                      <div className={`${c.imagen_url ? 'sm:col-span-8' : 'sm:col-span-12'} space-y-2`}>
+                        <h3 className="text-base sm:text-lg font-black text-white leading-tight">
+                          {c.titulo}
+                        </h3>
+                        {c.descripcion && (
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {c.descripcion}
+                          </p>
+                        )}
+
+                        {/* Horario y Fechas */}
+                        {(c.hora_inicio || c.dias_semana) && (
+                          <div className="flex items-center gap-1.5 text-xs text-amber-300 font-semibold pt-0.5">
+                            <Calendar size={13} className="shrink-0 text-amber-400" />
+                            <span>
+                              {c.dias_semana ? `${c.dias_semana} ` : ''}
+                              {c.hora_inicio ? `| ${c.hora_inicio} ${c.hora_fin ? `- ${c.hora_fin}` : ''}` : ''}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Botones de acción del evento */}
+                        <div className="pt-2 flex items-center gap-2 flex-wrap">
+                          {promoWhatsappUrl && (
+                            <a
+                              href={promoWhatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/40 active:scale-95 transition-all cursor-pointer"
+                            >
+                              <MessageCircle size={14} />
+                              <span>{c.texto_cta || 'Aprovechar por WhatsApp'}</span>
+                            </a>
+                          )}
+                          {c.url_externa && (
+                            <a
+                              href={c.url_externa}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 active:scale-95 transition-all"
+                            >
+                              <ExternalLink size={13} />
+                              <span>Más detalles</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Afiche / Foto de la promo */}
+                      {c.imagen_url && (
+                        <div className="sm:col-span-4 w-full h-40 sm:h-32 rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-inner shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={c.imagen_url}
+                            alt={c.titulo}
+                            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 

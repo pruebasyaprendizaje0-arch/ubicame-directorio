@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       zona: searchParams.get('zona') || searchParams.get('comuna') || undefined,
       tipo: searchParams.get('tipo') || undefined,
       solo_ubicame_cc: searchParams.get('solo_ubicame_cc') === 'true' ? true : undefined,
+      solo_promos: searchParams.get('solo_promos') === 'true' ? true : undefined,
       cerca_de_mi: cercaDeMi,
       user_lat: userLat,
       user_lng: userLng,

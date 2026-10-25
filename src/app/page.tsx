@@ -37,6 +37,7 @@ import {
   Home,
   Shield,
   Layers,
+  Flame,
 } from 'lucide-react';
 
 export default function DirectoryPage() {
@@ -68,6 +69,7 @@ export default function DirectoryPage() {
   const [selectedParroquia, setSelectedParroquia] = useState<string>('');
   const [selectedComuna, setSelectedComuna] = useState<string>('');
   const [onlyUbicameCc, setOnlyUbicameCc] = useState(false);
+  const [soloPromos, setSoloPromos] = useState(false);
   const [showGeoFilterBar, setShowGeoFilterBar] = useState(true);
 
   // "Cerca de mí" Geolocation State
@@ -195,6 +197,7 @@ export default function DirectoryPage() {
       if (selectedParroquia) params.set('parroquia', selectedParroquia);
       if (selectedComuna) params.set('zona', selectedComuna);
       if (onlyUbicameCc) params.set('solo_ubicame_cc', 'true');
+      if (soloPromos) params.set('solo_promos', 'true');
 
       if (cercaDeMi && userLocation) {
         params.set('cerca_de_mi', 'true');
@@ -212,7 +215,7 @@ export default function DirectoryPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedProvincia, selectedCanton, selectedParroquia, selectedComuna, onlyUbicameCc, cercaDeMi, userLocation]);
+  }, [searchQuery, selectedProvincia, selectedCanton, selectedParroquia, selectedComuna, onlyUbicameCc, soloPromos, cercaDeMi, userLocation]);
 
   useEffect(() => {
     loadPlaces();
@@ -299,8 +302,12 @@ export default function DirectoryPage() {
     return places.filter(p => p.prioridad === 1 || p.origen === 'ubicame_cc').length;
   }, [places]);
 
+  const totalPromos = useMemo(() => {
+    return places.filter(p => p.tiene_promo).length;
+  }, [places]);
+
   const hasActiveFilters = Boolean(
-    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || cercaDeMi || searchQuery
+    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || soloPromos || cercaDeMi || searchQuery
   );
 
   const clearAllFilters = () => {
@@ -310,6 +317,7 @@ export default function DirectoryPage() {
     setSelectedComuna('');
     setActiveLocality('');
     setOnlyUbicameCc(false);
+    setSoloPromos(false);
     setCercaDeMi(false);
     setUserLocation(null);
     setSearchQuery('');
@@ -511,6 +519,9 @@ export default function DirectoryPage() {
             provincias={PROVINCIAS_ECUADOR}
             onlyUbicameCc={onlyUbicameCc}
             setOnlyUbicameCc={setOnlyUbicameCc}
+            soloPromos={soloPromos}
+            setSoloPromos={setSoloPromos}
+            totalPromos={totalPromos}
             clearAllFilters={clearAllFilters}
             hasActiveFilters={hasActiveFilters}
             totalClients={totalClients}
@@ -804,6 +815,23 @@ export default function DirectoryPage() {
             >
               <Sparkles size={12} />
               <span>Destacados ubicame.cc</span>
+            </button>
+
+            <button
+              onClick={() => setSoloPromos(!soloPromos)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                soloPromos
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-orange-400 shadow-sm shadow-orange-500/20'
+                  : 'bg-orange-500/10 text-orange-400 border-orange-500/30 hover:bg-orange-500/20'
+              }`}
+            >
+              <Flame size={12} className={soloPromos ? 'fill-slate-950 text-slate-950' : 'fill-orange-400 text-orange-400'} />
+              <span>Promos & Eventos</span>
+              {(totalPromos > 0 || soloPromos) && (
+                <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${soloPromos ? 'bg-slate-950 text-orange-400' : 'bg-orange-500/20 text-orange-300'}`}>
+                  {soloPromos ? places.length : totalPromos}
+                </span>
+              )}
             </button>
 
             {availableComunas.slice(0, 12).map((comuna) => (

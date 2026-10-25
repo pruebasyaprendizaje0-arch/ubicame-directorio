@@ -37,7 +37,42 @@
     "whatsapp": "593994916012",
     "url_perfil": "https://ubicame.cc/clinica-santa-lucia",
     "estado": "activo",
-    "descripcion": "Atención médica general y servicios de salud para residentes y visitantes en Montañita y la Ruta del Spondylus. Agenda de citas y consultas."
+    "descripcion": "Atención médica general y servicios de salud para residentes y visitantes en Montañita y la Ruta del Spondylus. Agenda de citas y consultas.",
+    "campanas": [
+      {
+        "id": "2bf59470-7c1f-4cc7-8b38-d6681a65dad6",
+        "titulo": "🔥 Semana 2x1 & Música en Vivo",
+        "tipo": "PROMO",
+        "badge": "2x1 Esta Semana",
+        "descripcion": "¡Aprovecha nuestra promoción semanal exclusiva! 2x1 en platos seleccionados y show acústico en vivo los viernes y sábados.",
+        "fecha_inicio": "2026-10-26T00:55:43.769Z",
+        "fecha_fin": "2026-11-02T00:55:43.769Z",
+        "dias_semana": "Jueves a Domingo",
+        "tipo_descuento": "DEAL_2X1",
+        "valor_descuento": 50,
+        "tipo_cta": "WHATSAPP",
+        "texto_cta": "Pedir Promo por WhatsApp",
+        "mensaje_whatsapp": "¡Hola Clinica Santa Lucia! Vi en su perfil de Ubicame la promo semanal *2x1 & Música en Vivo* y deseo ordenar.",
+        "es_activa": true
+      }
+    ],
+    "tiene_promo": true,
+    "campana_destacada": {
+      "id": "2bf59470-7c1f-4cc7-8b38-d6681a65dad6",
+      "titulo": "🔥 Semana 2x1 & Música en Vivo",
+      "tipo": "PROMO",
+      "badge": "2x1 Esta Semana",
+      "descripcion": "¡Aprovecha nuestra promoción semanal exclusiva! 2x1 en platos seleccionados y show acústico en vivo los viernes y sábados.",
+      "fecha_inicio": "2026-10-26T00:55:43.769Z",
+      "fecha_fin": "2026-11-02T00:55:43.769Z",
+      "dias_semana": "Jueves a Domingo",
+      "tipo_descuento": "DEAL_2X1",
+      "valor_descuento": 50,
+      "tipo_cta": "WHATSAPP",
+      "texto_cta": "Pedir Promo por WhatsApp",
+      "mensaje_whatsapp": "¡Hola Clinica Santa Lucia! Vi en su perfil de Ubicame la promo semanal *2x1 & Música en Vivo* y deseo ordenar.",
+      "es_activa": true
+    }
   },
   {
     "id_slug": "el-pescador-restaurant-montanita",
@@ -78,7 +113,8 @@
     "url_perfil": "https://ubicame.cc/hostal-roses",
     "estado": "activo",
     "descripcion": "Hospedaje acogedor y confortable en Montañita con WiFi de alta velocidad, parqueadero gratuito, piscina y pet friendly. Reservas directas.",
-    "foto_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQcY_xEAXu6TLJ1K6Z0t2Zj7UoejwIHjOCt0H20uRxchA&s"
+    "foto_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQcY_xEAXu6TLJ1K6Z0t2Zj7UoejwIHjOCt0H20uRxchA&s",
+    "tiene_promo": false
   },
   {
     "id_slug": "la-pergola-olon",
@@ -119,7 +155,8 @@
     "url_perfil": "https://ubicame.cc/las-empanadas-de-mauro",
     "estado": "activo",
     "descripcion": "Las verdaderas empanadas gigantes de Montañita con relleno gourmet de carne, queso y mariscos frente al mar.",
-    "foto_url": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=150&auto=format&fit=crop&q=60&ixlib=rb-4.0.3"
+    "foto_url": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=150&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    "tiene_promo": false
   },
   {
     "id_slug": "mamma-mia",
@@ -142,6 +179,7 @@
     "estado": "activo",
     "descripcion": "Auténtica pizza napolitana al horno de leña, pastas artesanales y el mejor ambiente familiar de Manta.",
     "foto_url": "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=150&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    "tiene_promo": false,
     "exactitud_gps": "rooftop"
   },
   {
@@ -163,7 +201,8 @@
     "whatsapp": "593994916012",
     "url_perfil": "https://ubicame.cc/msd",
     "estado": "activo",
-    "descripcion": "Tienda y comercio en Manglaralto. Catálogo digital de artículos y atención directa."
+    "descripcion": "Tienda y comercio en Manglaralto. Catálogo digital de artículos y atención directa.",
+    "tiene_promo": false
   },
   {
     "id_slug": "olon-kayak-tours-olon",
@@ -203,7 +242,8 @@
     "whatsapp": "593994916012",
     "url_perfil": "https://ubicame.cc/reparaciones-limon",
     "estado": "activo",
-    "descripcion": "reparaciones limón en Manglaralto, Santa Elena. Menú digital y catálogo oficial en ubicame.cc."
+    "descripcion": "reparaciones limón en Manglaralto, Santa Elena. Menú digital y catálogo oficial en ubicame.cc.",
+    "tiene_promo": false
   },
   {
     "id_slug": "samai-lodge-holistic-manglaralto",
@@ -242,7 +282,8 @@
     "origen": "ubicame_cc",
     "url_perfil": "https://ubicame.cc/sonrisas-del-mar",
     "estado": "activo",
-    "descripcion": "Servicios profesionales y atención personalizada en la comuna de Montañita, Santa Elena."
+    "descripcion": "Servicios profesionales y atención personalizada en la comuna de Montañita, Santa Elena.",
+    "tiene_promo": false
   },
   {
     "id_slug": "sumeria-liquors",
@@ -264,7 +305,66 @@
     "url_perfil": "https://ubicame.cc/sumeria-liquors",
     "estado": "activo",
     "descripcion": "La Licorería Sumeria en Montañita es un establecimiento comercial reconocido por ofrecer servicio continuo las 24 horas del día, los 7 días de la semana. Destaca principalmente por su sistema de entregas a domicilio (delivery) 24/7, posicionándose como una solución altamente conveniente para residentes y turistas durante la vida nocturna de la comuna costera",
-    "foto_url": "https://lh3.googleusercontent.com/grass-cs/ACvplmMVt5xCyOeojzCtjfBEDS2Gmh61miB3-Gj_5lo_jUS7ntE9vB5Mz8DhZ4MFpUyoLpJZo2K4pqIDpdMSVxOO-g2EA55iDj-ub9OBd6Trv69ZSTi_WrU_Xw1M1kE8HKxpMnuaYLZI=w408-h725-k-no"
+    "foto_url": "https://lh3.googleusercontent.com/grass-cs/ACvplmMVt5xCyOeojzCtjfBEDS2Gmh61miB3-Gj_5lo_jUS7ntE9vB5Mz8DhZ4MFpUyoLpJZo2K4pqIDpdMSVxOO-g2EA55iDj-ub9OBd6Trv69ZSTi_WrU_Xw1M1kE8HKxpMnuaYLZI=w408-h725-k-no",
+    "campanas": [
+      {
+        "id": "5858cdb7-8083-4a4f-b874-59ec4178ed79",
+        "titulo": "Degustación de cerveza artesanal",
+        "tipo": "EVENT",
+        "badge": "Evento Especial",
+        "descripcion": "ven a nuestra tienda y prueba nuestra cerveza artesanal doble malta",
+        "imagen_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRiRjH93tDHdyEoWl26l6ICz0E0LELxe7BC2EYPx6UA5w&s=10",
+        "fecha_inicio": "2026-10-28T05:00:00.000Z",
+        "fecha_fin": "2026-10-28T05:00:00.000Z",
+        "fecha_evento": "2026-10-28T05:00:00.000Z",
+        "hora_inicio": "17:30",
+        "hora_fin": "22:00",
+        "dias_semana": "miércoles",
+        "tipo_descuento": "PERCENTAGE",
+        "valor_descuento": 15,
+        "tipo_cta": "WHATSAPP",
+        "texto_cta": "Aprovechar por WhatsApp",
+        "mensaje_whatsapp": "hola, deseo asistir a la degustación de la cerveza doble malta",
+        "es_activa": true
+      },
+      {
+        "id": "5c88b56b-7b12-463e-a65f-18606f6b4574",
+        "titulo": "promo cervecero",
+        "tipo": "PROMO",
+        "badge": "Promo Semanal",
+        "descripcion": "llevate un sixpack con hielo vasos",
+        "imagen_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQL0VrVpy9Nu_KJ6sKbcElCzYl_OwoAEXaq_D7jv_yAkA&s=10",
+        "fecha_inicio": "2026-10-26T05:00:00.000Z",
+        "fecha_fin": "2026-10-27T05:00:00.000Z",
+        "dias_semana": "lunes y martes",
+        "tipo_descuento": "PERCENTAGE",
+        "valor_descuento": 10,
+        "tipo_cta": "WHATSAPP",
+        "texto_cta": "Aprovechar por WhatsApp",
+        "es_activa": true
+      }
+    ],
+    "tiene_promo": true,
+    "campana_destacada": {
+      "id": "5858cdb7-8083-4a4f-b874-59ec4178ed79",
+      "titulo": "Degustación de cerveza artesanal",
+      "tipo": "EVENT",
+      "badge": "Evento Especial",
+      "descripcion": "ven a nuestra tienda y prueba nuestra cerveza artesanal doble malta",
+      "imagen_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRiRjH93tDHdyEoWl26l6ICz0E0LELxe7BC2EYPx6UA5w&s=10",
+      "fecha_inicio": "2026-10-28T05:00:00.000Z",
+      "fecha_fin": "2026-10-28T05:00:00.000Z",
+      "fecha_evento": "2026-10-28T05:00:00.000Z",
+      "hora_inicio": "17:30",
+      "hora_fin": "22:00",
+      "dias_semana": "miércoles",
+      "tipo_descuento": "PERCENTAGE",
+      "valor_descuento": 15,
+      "tipo_cta": "WHATSAPP",
+      "texto_cta": "Aprovechar por WhatsApp",
+      "mensaje_whatsapp": "hola, deseo asistir a la degustación de la cerveza doble malta",
+      "es_activa": true
+    }
   },
   {
     "id_slug": "tikilimbo-montanita",

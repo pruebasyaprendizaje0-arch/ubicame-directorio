@@ -17,6 +17,7 @@ import {
   Wrench,
   Calendar,
   BedDouble,
+  Flame,
 } from 'lucide-react';
 
 interface PlaceCardProps {
@@ -94,6 +95,13 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
             </span>
           ) : null}
 
+          {place.tiene_promo && (
+            <span className="text-[9.5px] font-black px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow-lg flex items-center gap-1 border border-orange-300/40 animate-pulse">
+              <Flame size={10} className="fill-white" />
+              <span>{place.campana_destacada?.badge || 'Promo Activa'}</span>
+            </span>
+          )}
+
           <span
             className="text-[9.5px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md shadow"
             style={{
@@ -152,6 +160,32 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place, onSelect, onViewOnM
             </div>
           </div>
         </div>
+
+        {/* Promo / Evento Destacado */}
+        {place.tiene_promo && place.campana_destacada && (
+          <div
+            onClick={() => onSelect && onSelect(place)}
+            className="mb-3 p-2.5 rounded-xl bg-gradient-to-r from-orange-950/70 via-amber-950/50 to-slate-900 border border-orange-500/40 cursor-pointer hover:border-orange-400 transition-colors shadow-sm"
+          >
+            <div className="flex items-center justify-between text-[10px] font-black uppercase text-orange-400">
+              <span className="flex items-center gap-1">
+                <Flame size={11} className="text-orange-400 fill-orange-400" />
+                <span>{place.campana_destacada.badge || 'Promo Activa'}</span>
+              </span>
+              {place.campana_destacada.dias_semana && (
+                <span className="text-slate-400 font-normal lowercase">{place.campana_destacada.dias_semana}</span>
+              )}
+            </div>
+            <div className="text-xs font-bold text-white mt-0.5 truncate">
+              {place.campana_destacada.titulo}
+            </div>
+            {place.campana_destacada.hora_inicio && (
+              <div className="text-[10px] text-amber-300 font-bold mt-0.5">
+                ⏰ {place.campana_destacada.hora_inicio} {place.campana_destacada.hora_fin ? `- ${place.campana_destacada.hora_fin}` : ''}
+              </div>
+            )}
+          </div>
+        )}
 
         {place.descripcion && (
           <p className="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">

@@ -140,6 +140,9 @@ export async function getLugares(filters?: PlaceFilters): Promise<Lugar[]> {
               descripcion: existing.descripcion || u.descripcion,
               email_propietario: existing.email_propietario || u.email_propietario,
               nombre_propietario: existing.nombre_propietario || u.nombre_propietario,
+              campanas: u.campanas && u.campanas.length > 0 ? u.campanas : existing.campanas,
+              tiene_promo: u.tiene_promo !== undefined ? u.tiene_promo : existing.tiene_promo,
+              campana_destacada: u.campana_destacada || existing.campana_destacada,
             });
           } else {
             map.set(u.id_slug, u);
@@ -205,6 +208,10 @@ function normalizeText(text?: string | null): string {
 
   if (filters?.solo_ubicame_cc) {
     results = results.filter(p => p.prioridad === 1 || p.origen === 'ubicame_cc');
+  }
+
+  if (filters?.solo_promos) {
+    results = results.filter(p => p.tiene_promo || (p.campanas && p.campanas.length > 0));
   }
 
   // Cálculo de distancia si se solicitó "Cerca de mí" con coordenadas del usuario
@@ -273,6 +280,9 @@ export async function getAllAdminLugares(): Promise<Lugar[]> {
             exactitud_gps: existing.exactitud_gps || u.exactitud_gps,
             foto_url: existing.foto_url || u.foto_url,
             descripcion: existing.descripcion || u.descripcion,
+            campanas: u.campanas && u.campanas.length > 0 ? u.campanas : existing.campanas,
+            tiene_promo: u.tiene_promo !== undefined ? u.tiene_promo : existing.tiene_promo,
+            campana_destacada: u.campana_destacada || existing.campana_destacada,
           });
         } else {
           map.set(u.id_slug, u);
@@ -352,6 +362,9 @@ export async function getLugarBySlug(slug: string): Promise<Lugar | null> {
           descripcion: basePlace.descripcion || liveMatch.descripcion,
           email_propietario: basePlace.email_propietario || liveMatch.email_propietario,
           nombre_propietario: basePlace.nombre_propietario || liveMatch.nombre_propietario,
+          campanas: liveMatch.campanas && liveMatch.campanas.length > 0 ? liveMatch.campanas : basePlace.campanas,
+          tiene_promo: liveMatch.tiene_promo !== undefined ? liveMatch.tiene_promo : basePlace.tiene_promo,
+          campana_destacada: liveMatch.campana_destacada || basePlace.campana_destacada,
         };
       }
       return liveMatch;

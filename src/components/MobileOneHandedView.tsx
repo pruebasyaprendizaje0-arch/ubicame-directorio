@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Lugar } from '@/types/lugar';
 import { PlaceCard } from '@/components/PlaceCard';
 import { formatDistance } from '@/lib/geo';
@@ -32,6 +32,7 @@ import {
   BedDouble,
   ShieldCheck,
   ChevronDown,
+  Flame,
 } from 'lucide-react';
 
 export interface MobileOneHandedViewProps {
@@ -63,6 +64,9 @@ export interface MobileOneHandedViewProps {
   provincias: string[];
   onlyUbicameCc: boolean;
   setOnlyUbicameCc: (b: boolean) => void;
+  soloPromos?: boolean;
+  setSoloPromos?: (b: boolean) => void;
+  totalPromos?: number;
   clearAllFilters: () => void;
   hasActiveFilters: boolean;
   totalClients: number;
@@ -102,6 +106,9 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   provincias,
   onlyUbicameCc,
   setOnlyUbicameCc,
+  soloPromos = false,
+  setSoloPromos,
+  totalPromos = 0,
   clearAllFilters,
   hasActiveFilters,
   totalClients,
@@ -123,6 +130,11 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
 
   // Active Card Index in Carousel
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Negocios con promociones o eventos activos
+  const placesWithPromos = useMemo(() => {
+    return places.filter((p) => p.tiene_promo && p.campana_destacada);
+  }, [places]);
 
   // Carousel ref and touch tracking
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -364,7 +376,95 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             <span>ubicame.cc</span>
             {totalClients > 0 && <span className="opacity-80">({totalClients})</span>}
           </button>
+
+          {/* Botón Filtro Rápido Promos & Eventos de Hoy */}
+          <button
+            onClick={() => setSoloPromos?.(!soloPromos)}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
+              soloPromos
+                ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 border-orange-400 font-black ring-2 ring-orange-500/30'
+                : 'bg-slate-900/90 text-orange-400 border-orange-500/40 hover:bg-slate-800'
+            }`}
+          >
+            <Flame size={12} className={soloPromos ? 'text-slate-950 fill-current' : 'text-orange-400 fill-orange-400'} />
+            <span>Promos & Eventos</span>
+            {(totalPromos > 0 || placesWithPromos.length > 0) && (
+              <span className={soloPromos ? 'text-slate-950 font-black' : 'text-orange-300'}>
+                ({soloPromos ? places.length : (totalPromos || placesWithPromos.length)})
+              </span>
+            )}
+          </button>
         </div>
+
+        {/* Radar de Eventos & Promociones de Hoy */}
+        {placesWithPromos.length > 0 && (
+          <div className="pt-2 pb-0.5 px-0">
+            <div className="flex items-center justify-between mb-1.5 px-1">
+              <div className="flex items-center gap-1.5 text-[10.5px] font-black uppercase text-orange-400 tracking-wide">
+                <Flame size={12} className="text-orange-400 fill-orange-400 animate-pulse" />
+                <span>Radar de Promos & Eventos</span>
+                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1.5 py-0.2 rounded-full border border-orange-500/30">
+                  En vivo
+                </span>
+              </div>
+              {soloPromos && (
+                <button
+                  onClick={() => setSoloPromos?.(false)}
+                  className="text-[10px] font-bold text-slate-400 hover:text-white underline cursor-pointer"
+                >
+                  Ver todos
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none overscroll-x-contain touch-pan-x">
+              {placesWithPromos.map((place: Lugar) => {
+                const c = place.campana_destacada!;
+                return (
+                  <div
+                    key={place.id_slug}
+                    onClick={() => {
+                      onSelectPlace(place);
+                      onViewOnMap(place);
+                      if (onOpenDetail) onOpenDetail(place);
+                    }}
+                    className="shrink-0 w-64 p-2 rounded-xl bg-gradient-to-r from-orange-950/80 via-slate-900/90 to-slate-950 border border-orange-500/40 shadow-lg hover:border-orange-400 transition-all cursor-pointer active:scale-95 flex items-center gap-2"
+                  >
+                    {c.imagen_url ? (
+                      <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 border border-slate-700 bg-slate-900">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={c.imagen_url}
+                          alt={c.titulo}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = '/icons/lugar.svg';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-11 h-11 rounded-lg bg-orange-950/80 border border-orange-500/30 flex items-center justify-center shrink-0 text-lg">
+                        🔥
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 text-[9px] font-black uppercase text-orange-400 truncate">
+                        <span>{c.badge || 'Evento'}</span>
+                        <span className="text-slate-400">· {place.nombre}</span>
+                      </div>
+                      <div className="text-xs font-bold text-white leading-tight truncate mt-0.5">
+                        {c.titulo}
+                      </div>
+                      <div className="text-[10px] text-amber-300 font-semibold truncate mt-0.5">
+                        {c.dias_semana || c.hora_inicio ? `⏰ ${c.dias_semana || ''} ${c.hora_inicio || ''}` : `📍 ${place.zona || place.ciudad}`}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ========================================================
@@ -559,6 +659,12 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                             <span>ubicame.cc</span>
                           </span>
                         )}
+                        {place.tiene_promo && (
+                          <span className="text-[8.5px] font-black px-1.5 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-rose-600 text-white shadow flex items-center gap-0.5 animate-pulse">
+                            <Flame size={8} className="fill-white" />
+                            <span>Promo</span>
+                          </span>
+                        )}
                         <span
                           className="text-[8.5px] font-bold px-1.5 py-0.5 rounded-full backdrop-blur-md shadow"
                           style={{
@@ -623,6 +729,28 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                           )}
                         </div>
                       </div>
+
+                      {/* Promo o Evento Activo en la Tarjeta */}
+                      {place.tiene_promo && place.campana_destacada && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onOpenDetail) onOpenDetail(place);
+                            else onSelectPlace(place);
+                          }}
+                          className="mt-1 mb-1 px-2 py-1 rounded-lg bg-orange-950/60 border border-orange-500/40 text-orange-200 flex items-center justify-between gap-1 shadow-sm active:scale-98 transition-all"
+                        >
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-[10px]">🔥</span>
+                            <span className="text-[10.5px] font-bold text-white truncate">
+                              {place.campana_destacada.titulo}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-amber-300 font-bold shrink-0">
+                            Ver promo ›
+                          </span>
+                        </div>
+                      )}
 
                       {/* Fila de Botones de Acción al alcance inmediato del pulgar */}
                       <div className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2 border-t border-slate-800/80">

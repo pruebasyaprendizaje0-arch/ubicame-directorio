@@ -29,6 +29,7 @@ export interface PlaceFilters {
   es_referencia?: boolean;
   es_servicio?: boolean;
   solo_ubicame_cc?: boolean;
+  solo_promos?: boolean;
   estado?: 'activo' | 'pendiente' | 'todos';
 }
 

@@ -118,11 +118,31 @@ function createCustomMarkerIcon(
       ">★</div>`
     : '';
 
+  const promoBadge = lugar.tiene_promo
+    ? `<div style="
+        position: absolute;
+        top: -6px;
+        left: -6px;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(135deg, #ea580c, #dc2626);
+        border: 1.5px solid #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        box-shadow: 0 0 12px rgba(234, 88, 12, 0.9);
+        z-index: 10;
+      ">🔥</div>`
+    : '';
+
   const html = `
     <div style="position: relative; width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
       ${pulseRingHtml}
       <div style="${containerStyle}">
         <img src="${iconSrc}" style="width: ${iconImgSize}px; height: ${iconImgSize}px; filter: invert(1); object-fit: contain;" alt="${lugar.tipo}" onerror="this.src='/icons/lugar.svg'" />
+        ${promoBadge}
         ${starBadge}
       </div>
     </div>
@@ -360,6 +380,32 @@ const PlaceMarker: React.FC<PlaceMarkerProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Promo / Evento Activo Spotlight */}
+          {place.tiene_promo && place.campana_destacada && (
+            <div className="mb-2.5 p-2 rounded-xl bg-gradient-to-r from-orange-950/70 via-amber-950/60 to-slate-900 border border-orange-500/40 text-orange-200 shadow-md">
+              <div className="flex items-center justify-between text-[9.5px] font-black uppercase text-orange-400">
+                <span className="flex items-center gap-1">
+                  <span>🔥</span>
+                  <span>{place.campana_destacada.badge || 'Evento Especial'}</span>
+                </span>
+                {place.campana_destacada.dias_semana && (
+                  <span className="text-slate-400 font-semibold lowercase">
+                    {place.campana_destacada.dias_semana}
+                  </span>
+                )}
+              </div>
+              <div className="font-bold text-[12px] text-white mt-0.5 line-clamp-1">
+                {place.campana_destacada.titulo}
+              </div>
+              {place.campana_destacada.hora_inicio && (
+                <div className="text-[10px] text-amber-300 font-bold mt-0.5 flex items-center gap-1">
+                  <span>⏰</span>
+                  <span>{place.campana_destacada.hora_inicio} {place.campana_destacada.hora_fin ? `- ${place.campana_destacada.hora_fin}` : ''}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Description */}
           {place.descripcion && (

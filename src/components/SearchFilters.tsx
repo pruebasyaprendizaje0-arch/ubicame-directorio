@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, X, ChevronDown, Sparkles, Crown, MapPin, Wrench, CheckCircle } from 'lucide-react';
+import { Search, X, ChevronDown, Sparkles, Crown, MapPin, Wrench, CheckCircle, Flame } from 'lucide-react';
 import { PlaceFilters } from '@/types/place';
 
 interface SearchFiltersProps {
@@ -148,6 +148,7 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
           onClick={() =>
             onChange({
               solo_ubicame_cc: !filters.solo_ubicame_cc ? true : undefined,
+              solo_promos: undefined,
               prioridad: undefined,
               es_referencia: undefined,
               es_servicio: undefined,
@@ -156,6 +157,23 @@ export const SearchFilters: React.FC<SearchFiltersProps> = ({
         >
           <Crown size={14} color="#f59e0b" />
           <span>Clientes ubicame.cc (P1)</span>
+        </button>
+
+        <button
+          className={`quick-tab ${filters.solo_promos ? 'active-orange' : ''}`}
+          style={filters.solo_promos ? { borderColor: '#f97316', background: 'rgba(249, 115, 22, 0.15)', color: '#fb923c' } : {}}
+          onClick={() =>
+            onChange({
+              solo_promos: !filters.solo_promos ? true : undefined,
+              solo_ubicame_cc: undefined,
+              prioridad: undefined,
+              es_referencia: undefined,
+              es_servicio: undefined,
+            })
+          }
+        >
+          <Flame size={14} color="#f97316" />
+          <span>🔥 Promos & Eventos</span>
         </button>
 
         <button

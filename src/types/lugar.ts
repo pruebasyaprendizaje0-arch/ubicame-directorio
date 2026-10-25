@@ -23,6 +23,31 @@ export interface Lugar {
   email_propietario?: string;
   nombre_propietario?: string;
   exactitud_gps?: 'rooftop' | 'interpolated' | 'approximate' | string;
+  campanas?: CampanaLugar[];
+  tiene_promo?: boolean;
+  campana_destacada?: CampanaLugar;
+}
+
+export interface CampanaLugar {
+  id: string;
+  titulo: string;
+  tipo: 'PROMO' | 'EVENT' | 'ACTIVITY' | string;
+  badge?: string;
+  descripcion?: string;
+  imagen_url?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  fecha_evento?: string;
+  hora_inicio?: string;
+  hora_fin?: string;
+  dias_semana?: string;
+  tipo_descuento?: string;
+  valor_descuento?: number;
+  tipo_cta?: string;
+  texto_cta?: string;
+  mensaje_whatsapp?: string;
+  url_externa?: string;
+  es_activa: boolean;
 }
 
 export interface PlaceFilters {
@@ -35,7 +60,9 @@ export interface PlaceFilters {
   zona?: string;
   tipo?: string;
   solo_ubicame_cc?: boolean;
+  solo_promos?: boolean;
   cerca_de_mi?: boolean;
   user_lat?: number;
   user_lng?: number;
 }
+

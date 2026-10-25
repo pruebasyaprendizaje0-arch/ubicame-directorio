@@ -1,4 +1,4 @@
-import { Lugar } from '@/types/lugar';
+import { Lugar, CampanaLugar } from '@/types/lugar';
 import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
@@ -301,12 +301,54 @@ export async function fetchUbicameCcBusinesses(): Promise<Lugar[]> {
 
   try {
     const res = await pool.query('SELECT * FROM "Restaurant" WHERE "isSuspended" = false ORDER BY "createdAt" DESC');
-    const lugares: Lugar[] = [];
+    
+    // Obtener campañas activas de BusinessCampaign en ubicame.cc
+    const campaignsByRestaurantId = new Map<string, CampanaLugar[]>();
+    try {
+      const cRes = await pool.query(`
+        SELECT * FROM "BusinessCampaign"
+        WHERE "isActive" = true
+        ORDER BY "order" ASC, "createdAt" DESC
+      `);
+      for (const c of cRes.rows) {
+        const list = campaignsByRestaurantId.get(c.restaurantId) || [];
+        list.push({
+          id: c.id,
+          titulo: c.title,
+          tipo: c.type || 'PROMO',
+          badge: c.badgeText || (c.type === 'EVENT' ? 'Evento Especial' : 'Promoción'),
+          descripcion: c.description || undefined,
+          imagen_url: c.imageUrl || undefined,
+          fecha_inicio: c.startDate ? new Date(c.startDate).toISOString() : undefined,
+          fecha_fin: c.endDate ? new Date(c.endDate).toISOString() : undefined,
+          fecha_evento: c.eventDate ? new Date(c.eventDate).toISOString() : undefined,
+          hora_inicio: c.startTime || undefined,
+          hora_fin: c.endTime || undefined,
+          dias_semana: c.daysOfWeek || undefined,
+          tipo_descuento: c.discountType || undefined,
+          valor_descuento: c.discountValue ? Number(c.discountValue) : undefined,
+          tipo_cta: c.ctaType || 'WHATSAPP',
+          texto_cta: c.ctaText || 'Aprovechar por WhatsApp',
+          mensaje_whatsapp: c.whatsappMessage || undefined,
+          url_externa: c.externalUrl || undefined,
+          es_activa: Boolean(c.isActive),
+        });
+        campaignsByRestaurantId.set(c.restaurantId, list);
+      }
+    } catch (cErr: any) {
+      console.warn('⚠️ [ubicameSync] No se pudo consultar "BusinessCampaign" en ubicame.cc:', cErr.message);
+    }
 
+    const lugares: Lugar[] = [];
     const updatePromises: Promise<any>[] = [];
 
     for (const r of res.rows) {
       const lugar = mapRestaurantToLugar(r);
+      const restCampaigns = campaignsByRestaurantId.get(r.id) || [];
+      lugar.campanas = restCampaigns;
+      lugar.tiene_promo = restCampaigns.length > 0;
+      lugar.campana_destacada = restCampaigns[0] || undefined;
+
       lugares.push(lugar);
 
       // Si el registro original en PostgreSQL carecía de coordenadas, actualizar la base de datos de inmediato
@@ -380,14 +422,19 @@ function persistLugaresToJsonAsync(newUbicameLugares: Lugar[]) {
           descripcion: existing.descripcion || u.descripcion,
           email_propietario: existing.email_propietario || u.email_propietario,
           nombre_propietario: existing.nombre_propietario || u.nombre_propietario,
+          campanas: u.campanas && u.campanas.length > 0 ? u.campanas : existing.campanas,
+          tiene_promo: u.tiene_promo !== undefined ? u.tiene_promo : existing.tiene_promo,
+          campana_destacada: u.campana_destacada || existing.campana_destacada,
         };
 
-        // Solo marcar cambio si realmente hay datos nuevos para no causar bucles de Fast Refresh
+        // Detectar cambios en datos clave o campañas
         if (
           existing.latitud !== merged.latitud ||
           existing.longitud !== merged.longitud ||
           existing.whatsapp !== merged.whatsapp ||
-          existing.url_perfil !== merged.url_perfil
+          existing.url_perfil !== merged.url_perfil ||
+          existing.tiene_promo !== merged.tiene_promo ||
+          JSON.stringify(existing.campanas) !== JSON.stringify(merged.campanas)
         ) {
           currentLugares[idx] = merged;
           hasChanges = true;
