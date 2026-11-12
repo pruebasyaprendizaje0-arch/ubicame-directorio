@@ -34,6 +34,7 @@ import {
   Check,
   Building,
   Landmark,
+  Store,
   Home,
   Shield,
   Layers,
@@ -306,8 +307,21 @@ export default function DirectoryPage() {
     return places.filter(p => p.tiene_promo).length;
   }, [places]);
 
+  // Filtro por tipo de entidad: todos | negocios | puntos de interés
+  const [tipoLugarFilter, setTipoLugarFilter] = useState<'all' | 'negocios' | 'interes'>('all');
+
+  const displayedPlaces = useMemo(() => {
+    if (tipoLugarFilter === 'negocios') {
+      return places.filter(p => !p.es_referencia);
+    }
+    if (tipoLugarFilter === 'interes') {
+      return places.filter(p => p.es_referencia);
+    }
+    return places;
+  }, [places, tipoLugarFilter]);
+
   const hasActiveFilters = Boolean(
-    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || soloPromos || cercaDeMi || searchQuery
+    selectedProvincia || selectedCanton || selectedParroquia || selectedComuna || onlyUbicameCc || soloPromos || cercaDeMi || searchQuery || tipoLugarFilter !== 'all'
   );
 
   const clearAllFilters = () => {
@@ -321,6 +335,7 @@ export default function DirectoryPage() {
     setCercaDeMi(false);
     setUserLocation(null);
     setSearchQuery('');
+    setTipoLugarFilter('all');
     setGpsNotification(null);
     try {
       localStorage.removeItem('ubicame_active_locality');
@@ -478,7 +493,7 @@ export default function DirectoryPage() {
           {/* 1. Mapa interactivo completo de fondo */}
           <div className="absolute inset-0 z-0">
             <DynamicMap
-              lugares={places}
+              lugares={displayedPlaces}
               selectedPlace={selectedPlace}
               onSelectPlace={(place) => {
                 setSelectedPlace({ ...place });
@@ -492,7 +507,10 @@ export default function DirectoryPage() {
 
           {/* 2. Experiencia Móvil al alcance del pulgar (Carrusel horizontal + Dock inferior) */}
           <MobileOneHandedView
-            places={places}
+            places={displayedPlaces}
+            allPlaces={places}
+            tipoLugarFilter={tipoLugarFilter}
+            setTipoLugarFilter={setTipoLugarFilter}
             selectedPlace={selectedPlace}
             onSelectPlace={(place) => {
               setSelectedPlace({ ...place });
@@ -835,6 +853,38 @@ export default function DirectoryPage() {
               )}
             </button>
 
+            {/* Filtro Rápido Desktop: Negocios */}
+            <button
+              onClick={() => setTipoLugarFilter(tipoLugarFilter === 'negocios' ? 'all' : 'negocios')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1.5 cursor-pointer ${
+                tipoLugarFilter === 'negocios'
+                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-sm shadow-cyan-500/20'
+                  : 'bg-slate-900/80 text-cyan-400 border-cyan-500/30 hover:bg-slate-800'
+              }`}
+            >
+              <Store size={12} />
+              <span>Negocios</span>
+              <span className="text-[11px] opacity-80">
+                ({places.filter((p) => !p.es_referencia).length})
+              </span>
+            </button>
+
+            {/* Filtro Rápido Desktop: Puntos de Interés */}
+            <button
+              onClick={() => setTipoLugarFilter(tipoLugarFilter === 'interes' ? 'all' : 'interes')}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1.5 cursor-pointer ${
+                tipoLugarFilter === 'interes'
+                  ? 'bg-purple-600 text-white border-purple-400 shadow-sm shadow-purple-500/20'
+                  : 'bg-purple-950/40 text-purple-300 border-purple-500/30 hover:bg-purple-900/40'
+              }`}
+            >
+              <Landmark size={12} />
+              <span>Puntos de Interés</span>
+              <span className="text-[11px] opacity-80">
+                ({places.filter((p) => p.es_referencia).length})
+              </span>
+            </button>
+
             {availableComunas.slice(0, 12).map((comuna) => (
               <button
                 key={comuna}
@@ -882,7 +932,7 @@ export default function DirectoryPage() {
             <div className="flex items-start gap-5">
               <div className="w-[52%]">
                 <ZoneList
-                  lugares={places}
+                  lugares={displayedPlaces}
                   onSelectPlace={handleSelectPlace}
                   onViewOnMap={handleViewOnMap}
                   isSplitView={true}
@@ -891,7 +941,7 @@ export default function DirectoryPage() {
 
               <div className="w-[48%] sticky top-20 h-[calc(100vh-110px)] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900/50">
                 <DynamicMap
-                  lugares={places}
+                  lugares={displayedPlaces}
                   selectedPlace={selectedPlace}
                   onSelectPlace={handleSelectPlace}
                   onClearSelection={() => setSelectedPlace(null)}
@@ -904,7 +954,7 @@ export default function DirectoryPage() {
             /* Full Width List View */
             <div className="w-full">
               <ZoneList
-                lugares={places}
+                lugares={displayedPlaces}
                 onSelectPlace={handleSelectPlace}
                 onViewOnMap={handleViewOnMap}
                 isSplitView={false}
@@ -914,7 +964,7 @@ export default function DirectoryPage() {
             /* Full Width Map View */
             <div className="w-full h-[76vh] min-h-[500px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
               <DynamicMap
-                lugares={places}
+                lugares={displayedPlaces}
                 selectedPlace={selectedPlace}
                 onSelectPlace={handleSelectPlace}
                 onClearSelection={() => setSelectedPlace(null)}

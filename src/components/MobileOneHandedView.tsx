@@ -21,6 +21,7 @@ import {
   Loader2,
   Building,
   Landmark,
+  Store,
   Home,
   Layers,
   Map as MapIcon,
@@ -40,6 +41,9 @@ import {
 
 export interface MobileOneHandedViewProps {
   places: Lugar[];
+  allPlaces?: Lugar[];
+  tipoLugarFilter?: 'all' | 'negocios' | 'interes';
+  setTipoLugarFilter?: (val: 'all' | 'negocios' | 'interes') => void;
   selectedPlace: Lugar | null;
   onSelectPlace: (place: Lugar) => void;
   onOpenDetail?: (place: Lugar) => void;
@@ -84,6 +88,9 @@ export interface MobileOneHandedViewProps {
 
 export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   places,
+  allPlaces,
+  tipoLugarFilter = 'all',
+  setTipoLugarFilter,
   selectedPlace,
   onSelectPlace,
   onOpenDetail,
@@ -151,6 +158,18 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
   const placesWithPromos = useMemo(() => {
     return places.filter((p) => p.tiene_promo && p.campana_destacada);
   }, [places]);
+
+  // Lista base sin filtro de tipo de entidad para contadores estables
+  const basePlaces = allPlaces || places;
+
+  // Conteo de negocios vs puntos de interés
+  const totalNegocios = useMemo(() => {
+    return basePlaces.filter((p) => !p.es_referencia).length;
+  }, [basePlaces]);
+
+  const totalPuntosInteres = useMemo(() => {
+    return basePlaces.filter((p) => p.es_referencia).length;
+  }, [basePlaces]);
 
   // Carousel ref and touch tracking
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -327,6 +346,35 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
               </div>
             )}
 
+            {/* Banner de filtro por tipo (Negocios o Puntos de Interés) activo */}
+            {tipoLugarFilter !== 'all' && (
+              <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-slate-950/90 border border-slate-700/80 backdrop-blur-md shadow-lg text-[11px] flex items-center justify-between gap-2 animate-fade-in">
+                <div className="flex items-center gap-1.5 truncate">
+                  {tipoLugarFilter === 'negocios' ? (
+                    <>
+                      <Store size={12} className="text-cyan-400 shrink-0" />
+                      <span className="font-bold text-cyan-300 truncate">
+                        Solo Negocios ({places.length})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Landmark size={12} className="text-purple-400 shrink-0" />
+                      <span className="font-bold text-purple-300 truncate">
+                        Solo Puntos de Interés ({places.length})
+                      </span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setTipoLugarFilter?.('all')}
+                  className="text-[10px] text-slate-300 hover:text-white font-bold underline shrink-0 cursor-pointer"
+                >
+                  Ver todos
+                </button>
+              </div>
+            )}
+
             {/* Banner de notificación GPS activa si existe */}
             {gpsNotification && (
               <div className="pointer-events-auto p-1.5 px-3 rounded-xl bg-emerald-950/90 border border-emerald-500/50 backdrop-blur-md shadow-lg text-[11px] text-emerald-300 flex items-center justify-between gap-2">
@@ -380,14 +428,43 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
                 onClick={() => {
                   setSelectedComuna('');
                   onSelectLocality?.('');
+                  setTipoLugarFilter?.('all');
                 }}
                 className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border cursor-pointer active:scale-95 ${
-                  selectedComuna === '' && !cercaDeMi
+                  selectedComuna === '' && !cercaDeMi && tipoLugarFilter === 'all'
                     ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/20'
                     : 'bg-slate-900/90 text-slate-300 border-slate-700/80 hover:bg-slate-800'
                 }`}
               >
-                Todos ({places.length})
+                Todos ({basePlaces.length})
+              </button>
+
+              {/* Botón Píldora Negocios */}
+              <button
+                onClick={() => setTipoLugarFilter?.(tipoLugarFilter === 'negocios' ? 'all' : 'negocios')}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                  tipoLugarFilter === 'negocios'
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black ring-2 ring-cyan-500/30'
+                    : 'bg-slate-900/90 text-cyan-300 border-cyan-500/40 hover:bg-slate-800'
+                }`}
+              >
+                <Store size={11} className={tipoLugarFilter === 'negocios' ? 'text-slate-950' : 'text-cyan-400'} />
+                <span>Negocios</span>
+                {totalNegocios > 0 && <span className="opacity-80">({totalNegocios})</span>}
+              </button>
+
+              {/* Botón Píldora Puntos de Interés */}
+              <button
+                onClick={() => setTipoLugarFilter?.(tipoLugarFilter === 'interes' ? 'all' : 'interes')}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition-all shadow-md backdrop-blur-md border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                  tipoLugarFilter === 'interes'
+                    ? 'bg-purple-600 text-white border-purple-400 font-black ring-2 ring-purple-500/30'
+                    : 'bg-slate-900/90 text-purple-300 border-purple-500/40 hover:bg-slate-800'
+                }`}
+              >
+                <Landmark size={11} className={tipoLugarFilter === 'interes' ? 'text-white' : 'text-purple-400'} />
+                <span>Puntos de Interés</span>
+                {totalPuntosInteres > 0 && <span className="opacity-80">({totalPuntosInteres})</span>}
               </button>
 
               <button
@@ -579,6 +656,73 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
           >
             {isZenMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
+
+          {/* Separador visual sutil entre controles de UI y capas/filtros de contenido */}
+          {!isZenMode && (
+            <div className="w-5 h-[1px] bg-slate-800/80 my-0.5" />
+          )}
+
+          {/* Botón 5: 🏢 Negocios (Filtrar / Conmutar solo comercios y locales) */}
+          {!isZenMode && (
+            <button
+              onClick={() => {
+                setTipoLugarFilter?.(tipoLugarFilter === 'negocios' ? 'all' : 'negocios');
+              }}
+              className={`relative w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_18px_rgba(0,0,0,0.7)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                tipoLugarFilter === 'negocios'
+                  ? 'bg-slate-900/95 border-cyan-400 text-cyan-300 ring-2 ring-cyan-500/50 shadow-cyan-500/30 font-black'
+                  : 'bg-slate-950/85 hover:bg-slate-900 border-slate-700/80 text-slate-400 hover:text-white'
+              }`}
+              title={
+                tipoLugarFilter === 'negocios'
+                  ? 'Mostrando solo negocios (Click para ver todos)'
+                  : 'Filtrar solo negocios'
+              }
+              aria-label="Filtrar solo negocios"
+            >
+              <Store size={18} className={tipoLugarFilter === 'negocios' ? 'text-cyan-400' : 'text-slate-300'} />
+              {totalNegocios > 0 && (
+                <span
+                  className={`absolute -top-1.5 -right-1.5 px-1 min-w-[17px] h-[17px] rounded-full border border-white text-[9px] font-black flex items-center justify-center shadow ${
+                    tipoLugarFilter === 'negocios' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {totalNegocios}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Botón 6: 🏛️ Puntos de Interés (Filtrar / Conmutar solo referencias y sitios turísticos) */}
+          {!isZenMode && (
+            <button
+              onClick={() => {
+                setTipoLugarFilter?.(tipoLugarFilter === 'interes' ? 'all' : 'interes');
+              }}
+              className={`relative w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-[0_4px_18px_rgba(0,0,0,0.7)] backdrop-blur-xl border active:scale-90 cursor-pointer ${
+                tipoLugarFilter === 'interes'
+                  ? 'bg-slate-900/95 border-purple-400 text-purple-300 ring-2 ring-purple-500/50 shadow-purple-500/30 font-black'
+                  : 'bg-slate-950/85 hover:bg-slate-900 border-purple-500/40 text-purple-400 hover:text-purple-300'
+              }`}
+              title={
+                tipoLugarFilter === 'interes'
+                  ? 'Mostrando solo puntos de interés (Click para ver todos)'
+                  : 'Filtrar solo puntos de interés y referencias'
+              }
+              aria-label="Filtrar solo puntos de interés"
+            >
+              <Landmark size={18} className={tipoLugarFilter === 'interes' ? 'text-purple-300' : 'text-purple-400'} />
+              {totalPuntosInteres > 0 && (
+                <span
+                  className={`absolute -top-1.5 -right-1.5 px-1 min-w-[17px] h-[17px] rounded-full border border-white text-[9px] font-black flex items-center justify-center shadow ${
+                    tipoLugarFilter === 'interes' ? 'bg-purple-600 text-white' : 'bg-purple-950/90 text-purple-300 border-purple-400/60'
+                  }`}
+                >
+                  {totalPuntosInteres}
+                </span>
+              )}
+            </button>
+          )}
         </aside>
       )}
 
@@ -589,7 +733,7 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
         <div className="absolute inset-0 z-20 bg-[#070b16] pt-14 pb-20 px-3 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800">
           <div className="flex items-center justify-between mb-3 px-1">
             <span className="text-xs font-bold text-slate-300">
-              Mostrando {places.length} lugares
+              Mostrando {places.length} {tipoLugarFilter === 'interes' ? 'puntos de interés' : tipoLugarFilter === 'negocios' ? 'negocios' : 'lugares'}
             </span>
             <button
               onClick={() => setMobileMode('map')}
@@ -944,7 +1088,9 @@ export const MobileOneHandedView: React.FC<MobileOneHandedViewProps> = ({
             className="pointer-events-auto flex items-center gap-2 py-2 px-4 rounded-full bg-slate-950/90 hover:bg-slate-900 border border-cyan-500/60 shadow-[0_6px_20px_rgba(0,0,0,0.85)] backdrop-blur-md text-[11px] font-black text-cyan-300 active:scale-95 transition-all cursor-pointer ring-1 ring-cyan-500/20"
           >
             <Layers size={13} className="text-cyan-400" />
-            <span>Ver {places.length} fichas de negocios</span>
+            <span>
+              Ver {places.length} {tipoLugarFilter === 'interes' ? 'puntos de interés' : tipoLugarFilter === 'negocios' ? 'fichas de negocios' : 'fichas de negocios'}
+            </span>
             <ChevronUp size={13} className="text-cyan-400 stroke-[2.5]" />
           </button>
         </div>
